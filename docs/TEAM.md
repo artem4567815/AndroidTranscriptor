@@ -43,10 +43,13 @@
 
 ## Роль 3 — Диаризация, пайплайн и мост
 
-- [ ] `SileroVoiceActivityDetector` и `SherpaDiarizer` на sherpa-onnx
+Подробно — [ROLE3.md](ROLE3.md): состояние, запуск, грабли.
+
+- [x] `SileroVoiceActivityDetector` и `SherpaDiarizer` на sherpa-onnx (проверено на эмуляторе)
+- [ ] Свои русские записи с разметкой «кто когда говорил» для DER
 - [ ] Подбор `clusterThreshold`, `mergeGapMs`, `segmentPaddingMs` на стенде (DER, ошибка границ)
 - [ ] Границы реплик: уточнение по таймштампам токенов ASR (`RecognizedSegment.tokens`)
-- [ ] `StenoPlugin`: проверить импорт/экспорт/шаринг и разрешения на 2–3 версиях Android
+- [ ] `StenoPlugin`: импорт, запись, обработка проверены на эмуляторе; экспорт/шаринг и разрешения на 2–3 версиях Android — нет
 - [ ] `TranscriptionService`: поведение при сворачивании и нехватке памяти, тест на длинной записи (1 ч)
 - [ ] Обработка `OUT_OF_MEMORY` и отмены на каждом этапе
 

@@ -17,6 +17,8 @@ data class AsrChunk(
  * Нарезка сегментов говорящих для ASR:
  *  - сегменты короче minUtteranceMs отбрасываются (обрывки диаризации);
  *  - сегменты длиннее maxSegmentMs режутся по паузам VAD (середина паузы), при отсутствии пауз — жёстко;
+ *  - пересечения отрезков разных спикеров разрешаются (см. [resolveOverlaps]), чтобы один и тот же
+ *    кусок аудио не распознавался дважды и слова не дублировались в двух репликах;
  *  - к каждому куску добавляется паддинг segmentPaddingMs в пределах записи.
  */
 object SegmentPlanner {
@@ -28,9 +30,8 @@ object SegmentPlanner {
         durationMs: Long,
     ): List<AsrChunk> {
         val cuts = pauseMidpoints(speech)
-        return segments
+        return resolveOverlaps(segments)
             .filter { it.endMs - it.startMs >= config.minUtteranceMs }
-            .sortedBy { it.startMs }
             .flatMap { split(it, cuts, config.maxSegmentMs) }
             .map { s ->
                 AsrChunk(
@@ -41,6 +42,42 @@ object SegmentPlanner {
                     audioEndMs = (s.endMs + config.segmentPaddingMs).coerceAtMost(durationMs),
                 )
             }
+    }
+
+    /**
+     * Делает отрезки непересекающимися — каждый момент записи принадлежит одному спикеру:
+     *  - тот же спикер — отрезки сливаются;
+     *  - частичное пересечение разных спикеров — режем посередине пересечения;
+     *  - короткий отрезок целиком внутри длинного (реплика «да» поверх чужой речи) —
+     *    длинный разрезается на две части вокруг короткого.
+     * Результат отсортирован по времени. Слишком короткие обрезки потом отбросит фильтр minUtteranceMs.
+     */
+    fun resolveOverlaps(segments: List<SpeakerSegment>): List<SpeakerSegment> {
+        val out = ArrayList<SpeakerSegment>(segments.size)
+        for (seg in segments.sortedWith(compareBy<SpeakerSegment> { it.startMs }.thenBy { it.endMs })) {
+            val prev = out.lastOrNull()
+            // Начало предыдущего могли сдвинуть при прошлом разрезе — не залезаем левее него.
+            var s = if (prev != null && seg.startMs < prev.startMs) seg.copy(startMs = prev.startMs) else seg
+            if (s.endMs <= s.startMs) continue
+            when {
+                prev == null || s.startMs >= prev.endMs -> out += s
+                s.speaker == prev.speaker ->
+                    out[out.lastIndex] = prev.copy(endMs = maxOf(prev.endMs, s.endMs))
+                s.endMs < prev.endMs -> {
+                    // Короткий внутри длинного: длинный = [до] + короткий + [после].
+                    out[out.lastIndex] = prev.copy(endMs = s.startMs)
+                    out += s
+                    out += prev.copy(startMs = s.endMs)
+                }
+                else -> {
+                    val mid = (s.startMs + prev.endMs) / 2
+                    out[out.lastIndex] = prev.copy(endMs = mid)
+                    s = s.copy(startMs = mid)
+                    out += s
+                }
+            }
+        }
+        return out.filter { it.endMs > it.startMs }
     }
 
     /** Если диаризация ничего не нашла, а VAD нашёл речь — один спикер на всю речь. */

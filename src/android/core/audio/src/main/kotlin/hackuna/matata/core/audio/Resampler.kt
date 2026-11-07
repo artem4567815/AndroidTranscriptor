@@ -7,11 +7,6 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/**
- * Ресемплер на оконном sinc (окно Ханна). При понижении частоты срез фильтра
- * опускается до новой частоты Найквиста, чтобы не было наложения спектров.
- * Чистый Kotlin — покрыт unit-тестами.
- */
 object Resampler {
     private const val ZERO_CROSSINGS = 16
 
@@ -21,7 +16,6 @@ object Resampler {
         val ratio = toRate.toDouble() / fromRate
         val outLen = floor(input.size * ratio).toInt().coerceAtLeast(1)
         val out = FloatArray(outLen)
-        // Срез относительно входной частоты: 1.0 = Найквист входа.
         val cutoff = min(1.0, ratio) * 0.97
         val halfWidth = ZERO_CROSSINGS / cutoff // в отсчётах входа
         for (i in 0 until outLen) {
@@ -49,7 +43,6 @@ object Resampler {
     }
 }
 
-/** Смешивает чередующиеся каналы в моно (среднее). */
 fun downmixToMono(interleaved: FloatArray, channels: Int): FloatArray {
     require(channels >= 1)
     if (channels == 1) return interleaved
@@ -60,8 +53,6 @@ fun downmixToMono(interleaved: FloatArray, channels: Int): FloatArray {
         s / channels
     }
 }
-
-/** Растущий буфер float без боксинга — для потокового декодирования. */
 class FloatBuffer(initialCapacity: Int = 1 shl 16) {
     private var data = FloatArray(initialCapacity)
     var size: Int = 0

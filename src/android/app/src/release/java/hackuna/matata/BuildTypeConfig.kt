@@ -1,5 +1,6 @@
 package hackuna.matata
 
+import hackuna.matata.core.model.SpeechRecognizerFactory
 import hackuna.matata.core.model.TranscriptionPipeline
 import org.koin.core.Koin
 
@@ -13,4 +14,6 @@ object BuildTypeConfig {
 
     @Suppress("UNUSED_PARAMETER")
     fun fakePipeline(koin: Koin, modelsReady: Boolean): TranscriptionPipeline? = null
+
+    fun fakeAsrFactory(): SpeechRecognizerFactory? = null
 }

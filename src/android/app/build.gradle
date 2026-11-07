@@ -13,30 +13,28 @@ android {
     namespace = "hackuna.matata"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "hackuna.matata"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.1.0"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        ndk { abiFilters 'arm64-v8a' }
-        aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
-        }
+        applicationId = "hackuna.matata"
+        minSdk = rootProject.ext.minSdkVersion
+        targetSdk = rootProject.ext.targetSdkVersion
+        versionCode = 1
+        versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk { abiFilters += ['arm64-v8a'] }
     }
-    // Модели не сжимаем: их копирует ModelManager потоково, а сжатие только замедляет сборку.
     androidResources {
+        // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+        // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+        ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        // Модели не сжимаем: их копирует ModelManager потоково, а сжатие только замедляет сборку.
         noCompress += ['onnx', 'gguf', 'litertlm', 'bin', 'tflite', 'task']
     }
     signingConfigs {
         release {
             if (keystorePropsFile.exists()) {
-                storeFile rootProject.file(keystoreProps['storeFile'])
-                storePassword keystoreProps['storePassword']
-                keyAlias keystoreProps['keyAlias']
-                keyPassword keystoreProps['keyPassword']
+                storeFile = rootProject.file(keystoreProps['storeFile'])
+                storePassword = keystoreProps['storePassword']
+                keyAlias = keystoreProps['keyAlias']
+                keyPassword = keystoreProps['keyPassword']
             }
         }
     }
@@ -45,21 +43,25 @@ android {
             // FakePipeline (только debug): auto — когда модели не установлены; true — всегда; false — никогда.
             // Пример: ./gradlew installDebug -Psteno.fakePipeline=true
             buildConfigField "String", "FAKE_PIPELINE", "\"${project.findProperty('steno.fakePipeline') ?: 'auto'}\""
+            // Заглушка ASR (только debug): настоящие VAD и диаризация, вместо текста — «[речь 3,2 с]».
+            // Пример: ./gradlew installDebug -Psteno.fakePipeline=false -Psteno.fakeAsr=true
+            buildConfigField "String", "FAKE_ASR", "\"${project.findProperty('steno.fakeAsr') ?: 'false'}\""
         }
         release {
             buildConfigField "String", "FAKE_PIPELINE", "\"false\""
-            minifyEnabled false   // включать только после проверки keep-правил
+            buildConfigField "String", "FAKE_ASR", "\"false\""
+            minifyEnabled = false   // включать только после проверки keep-правил
             if (keystorePropsFile.exists()) {
-                signingConfig signingConfigs.release
+                signingConfig = signingConfigs.release
             } else {
                 logger.warn('WARNING: keystore.properties не найден — release подписан debug-ключом')
-                signingConfig signingConfigs.debug
+                signingConfig = signingConfigs.debug
             }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     buildFeatures {
-        buildConfig true
+        buildConfig = true
     }
     testOptions {
         unitTests.returnDefaultValues = true

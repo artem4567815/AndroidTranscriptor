@@ -20,6 +20,8 @@ function emptyStages(): Record<Stage, StageState> {
 export const useProcessingStore = defineStore('processing', () => {
   const recordingId = ref<string | null>(null)
   const running = ref(false)
+  /** Нажали «Отмена», но обработка ещё не остановилась. */
+  const cancelRequested = ref(false)
   const completed = ref(false)
   const failure = ref<(FailedEvent & { text: string }) | null>(null)
   const stages = reactive(emptyStages())
@@ -43,6 +45,7 @@ export const useProcessingStore = defineStore('processing', () => {
     if (ticker) clearInterval(ticker)
     ticker = null
     finishedAt.value = Date.now()
+    cancelRequested.value = false
   }
 
   /** Подписка на события плагина — один раз за жизнь приложения. */
@@ -96,6 +99,7 @@ export const useProcessingStore = defineStore('processing', () => {
     resetStages()
     failure.value = null
     completed.value = false
+    cancelRequested.value = false
     running.value = true
     startedAt.value = Date.now()
     finishedAt.value = null
@@ -119,12 +123,15 @@ export const useProcessingStore = defineStore('processing', () => {
   }
 
   async function cancel() {
+    if (!running.value || cancelRequested.value) return
+    cancelRequested.value = true
     await (await getSteno()).cancel()
   }
 
   return {
     recordingId,
     running,
+    cancelRequested,
     completed,
     failure,
     stages,
