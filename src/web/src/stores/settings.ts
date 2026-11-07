@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { getSteno, type ModelInfo, type PipelineOptions, type StenoErrorCode } from '@/native'
 import type { StenoMockControls } from '@/native/steno.mock'
@@ -7,6 +6,7 @@ import { errorMessage } from '@/utils/errors'
 const KEY = 'steno.settings.v1'
 
 interface Persisted {
+  theme: 'light' | 'dark' | 'system'
   numSpeakers: number
   enableLlmProtocol: boolean
   enableLlmCorrection: boolean
@@ -17,6 +17,7 @@ interface Persisted {
 
 /** Значения по умолчанию совпадают с PipelineConfig и config/pipeline.default.json. */
 export const DEFAULTS: Persisted = {
+  theme: 'light',
   numSpeakers: 0,
   enableLlmProtocol: true,
   enableLlmCorrection: false,
@@ -33,19 +34,20 @@ function load(): Persisted {
   }
 }
 
-export const useSettingsStore = defineStore('settings', () => {
-  const s = load()
-  const numSpeakers = ref(s.numSpeakers)
-  const enableLlmProtocol = ref(s.enableLlmProtocol)
-  const enableLlmCorrection = ref(s.enableLlmCorrection)
-  const numThreads = ref(s.numThreads)
-  const clusterThreshold = ref(s.clusterThreshold)
-  const vadThreshold = ref(s.vadThreshold)
-  const models = ref<ModelInfo[]>([])
-  const modelsError = ref<string | null>(null)
+const s = load()
+const theme = ref<Persisted['theme']>(s.theme)
+const numSpeakers = ref(s.numSpeakers)
+const enableLlmProtocol = ref(s.enableLlmProtocol)
+const enableLlmCorrection = ref(s.enableLlmCorrection)
+const numThreads = ref(s.numThreads)
+const clusterThreshold = ref(s.clusterThreshold)
+const vadThreshold = ref(s.vadThreshold)
+const models = ref<ModelInfo[]>([])
+const modelsError = ref<string | null>(null)
 
-  watch(
+watch(
     [
+      theme,
       numSpeakers,
       enableLlmProtocol,
       enableLlmCorrection,
@@ -55,6 +57,7 @@ export const useSettingsStore = defineStore('settings', () => {
     ],
     () => {
       const data: Persisted = {
+        theme: theme.value,
         numSpeakers: numSpeakers.value,
         enableLlmProtocol: enableLlmProtocol.value,
         enableLlmCorrection: enableLlmCorrection.value,
@@ -68,9 +71,9 @@ export const useSettingsStore = defineStore('settings', () => {
         /* приватный режим браузера — настройки живут до перезагрузки */
       }
     },
-  )
+)
 
-  function pipelineOptions(): PipelineOptions {
+function pipelineOptions(): PipelineOptions {
     return {
       numSpeakers: numSpeakers.value,
       enableLlmProtocol: enableLlmProtocol.value,
@@ -78,43 +81,45 @@ export const useSettingsStore = defineStore('settings', () => {
       numThreads: numThreads.value,
       clusterThreshold: clusterThreshold.value,
       vadThreshold: vadThreshold.value,
-    }
+}
   }
 
-  function resetDefaults() {
+function resetDefaults() {
+    theme.value = DEFAULTS.theme
     numSpeakers.value = DEFAULTS.numSpeakers
     enableLlmProtocol.value = DEFAULTS.enableLlmProtocol
     enableLlmCorrection.value = DEFAULTS.enableLlmCorrection
     numThreads.value = DEFAULTS.numThreads
     clusterThreshold.value = DEFAULTS.clusterThreshold
     vadThreshold.value = DEFAULTS.vadThreshold
-  }
+}
 
-  async function loadModels() {
+async function loadModels() {
     modelsError.value = null
     try {
       models.value = (await (await getSteno()).getModelsInfo()).items
     } catch (e) {
       modelsError.value = errorMessage(e)
-    }
+}
   }
 
   /** Ручки мока доступны только в dev-режиме браузера. */
-  const isMock = import.meta.env.DEV
-  async function mockControls(): Promise<StenoMockControls | null> {
+const isMock = import.meta.env.DEV
+async function mockControls(): Promise<StenoMockControls | null> {
     if (!import.meta.env.DEV) return null
     const p = (await getSteno()) as unknown as Partial<StenoMockControls>
     return typeof p.devFailNext === 'function' ? (p as StenoMockControls) : null
-  }
-  async function devFailNext(code: StenoErrorCode | null) {
+}
+async function devFailNext(code: StenoErrorCode | null) {
     ;(await mockControls())?.devFailNext(code)
-  }
-  async function devSetSpeed(x: number) {
+}
+async function devSetSpeed(x: number) {
     ;(await mockControls())?.devSetSpeed(x)
-  }
-
+}
+export function useSettingsStore() {
   return {
     numSpeakers,
+    theme,
     enableLlmProtocol,
     enableLlmCorrection,
     numThreads,
@@ -129,4 +134,4 @@ export const useSettingsStore = defineStore('settings', () => {
     devFailNext,
     devSetSpeed,
   }
-})
+}

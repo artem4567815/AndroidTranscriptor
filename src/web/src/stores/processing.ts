@@ -1,4 +1,3 @@
-import { defineStore } from 'pinia'
 import { computed, reactive, ref } from 'vue'
 import { getSteno, STAGES, type FailedEvent, type PipelineOptions, type Stage } from '@/native'
 import { errorMessage } from '@/utils/errors'
@@ -17,18 +16,17 @@ function emptyStages(): Record<Stage, StageState> {
   >
 }
 
-export const useProcessingStore = defineStore('processing', () => {
-  const recordingId = ref<string | null>(null)
-  const running = ref(false)
-  const completed = ref(false)
-  const failure = ref<(FailedEvent & { text: string }) | null>(null)
-  const stages = reactive(emptyStages())
-  const currentStage = ref<Stage | null>(null)
-  const startedAt = ref<number | null>(null)
-  const finishedAt = ref<number | null>(null)
-  const now = ref(Date.now())
-  let ticker: ReturnType<typeof setInterval> | null = null
-  let listening: Promise<void> | null = null
+const recordingId = ref<string | null>(null)
+const running = ref(false)
+const completed = ref(false)
+const failure = ref<(FailedEvent & { text: string }) | null>(null)
+const stages = reactive(emptyStages())
+const currentStage = ref<Stage | null>(null)
+const startedAt = ref<number | null>(null)
+const finishedAt = ref<number | null>(null)
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | null = null
+let listening: Promise<void> | null = null
 
   const elapsedMs = computed(() =>
     startedAt.value ? (finishedAt.value ?? now.value) - startedAt.value : 0,
@@ -122,6 +120,7 @@ export const useProcessingStore = defineStore('processing', () => {
     await (await getSteno()).cancel()
   }
 
+export function useProcessingStore() {
   return {
     recordingId,
     running,
@@ -135,4 +134,4 @@ export const useProcessingStore = defineStore('processing', () => {
     start,
     cancel,
   }
-})
+}

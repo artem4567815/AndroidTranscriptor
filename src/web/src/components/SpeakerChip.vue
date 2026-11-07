@@ -28,10 +28,18 @@ const label = computed(() => speakerLabel(props.speakerId, props.names ?? {}))
   padding: 2px 10px 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--chip-color);
-  background: transparent;
+  background: color-mix(in srgb, var(--chip-color) 10%, transparent);
   color: var(--chip-color);
   font-size: 13px;
   font-weight: 600;
+}
+:root[data-theme="dark"] .speaker-chip {
+  color: color-mix(in srgb, var(--chip-color) 72%, #fff);
+  border-color: color-mix(in srgb, var(--chip-color) 72%, #fff);
+  background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+}
+:root[data-theme="dark"] .dot {
+  background: color-mix(in srgb, var(--chip-color) 72%, #fff);
 }
 .dot {
   width: 8px;

@@ -1,36 +1,64 @@
-/* Тема на CSS-переменных Ionic. Тёмная тема — по системной настройке (dark.system.css). */
+/* Собственная визуальная система: светлая, воздушная, с контрастными акцентами. */
 :root {
-  --ion-color-primary: #3a5bd9;
-  --ion-color-primary-rgb: 58, 91, 217;
-  --ion-color-primary-contrast: #ffffff;
-  --ion-color-primary-contrast-rgb: 255, 255, 255;
-  --ion-color-primary-shade: #3350bf;
-  --ion-color-primary-tint: #4e6bdd;
+  --app-primary: #6157e8;
+  --app-primary-soft: #766df0;
+  --app-bg: #f8f7ff;
 
-  /* Палитра из 8 цветов спикеров, подобрана под контраст на светлом фоне. */
-  --speaker-1: #3a5bd9;
-  --speaker-2: #d9480f;
-  --speaker-3: #2b8a3e;
-  --speaker-4: #ae3ec9;
-  --speaker-5: #0b7285;
-  --speaker-6: #c2255c;
-  --speaker-7: #8f6a00;
-  --speaker-8: #5f3dc4;
+  --app-surface: rgba(255, 255, 255, 0.82);
+  --app-surface-solid: #ffffff;
+  --app-ink: #202034;
+  --app-muted: #8d8ca5;
+  --app-border: rgba(49, 43, 105, 0.1);
+  --app-shadow: 0 20px 55px rgba(74, 64, 146, 0.12);
+  --app-radius-lg: 32px;
+  --app-radius-md: 24px;
+  --app-radius-sm: 17px;
+  --app-space: 22px;
+  --app-lilac: #e6e1ff;
+  --app-peach: #ffe1d2;
+  --app-mint: #d8f6e8;
+  --app-yellow: #fff1bb;
 
-  --utterance-active-bg: rgba(58, 91, 217, 0.1);
+  --speaker-1: #6157e8;
+  --speaker-2: #ed725d;
+  --speaker-3: #17a86b;
+  --speaker-4: #c65be9;
+  --speaker-5: #208fbe;
+  --speaker-6: #df4f8e;
+  --speaker-7: #bd8614;
+  --speaker-8: #7353d8;
+
+  --utterance-active-bg: #edeaff;
+}
+
+:root[data-theme="dark"] {
+  --app-bg: #10121e;
+  --app-surface: rgba(30, 31, 52, 0.84);
+  --app-surface-solid: #202238;
+  --app-ink: #f5f3ff;
+  --app-muted: #b7b6d0;
+  --app-border: rgba(202, 198, 255, 0.18);
+  --app-shadow: 0 20px 55px rgba(0, 0, 0, 0.34);
+  --app-lilac: #373265;
+  --app-peach: #593746;
+  --app-mint: #1d5149;
+  --app-yellow: #665525;
+  --utterance-active-bg: #37336b;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --speaker-1: #91a7ff;
-    --speaker-2: #ffa94d;
-    --speaker-3: #8ce99a;
-    --speaker-4: #e599f7;
-    --speaker-5: #66d9e8;
-    --speaker-6: #faa2c1;
-    --speaker-7: #ffe066;
-    --speaker-8: #b197fc;
-
-    --utterance-active-bg: rgba(145, 167, 255, 0.16);
+  :root[data-theme="system"] {
+    --app-bg: #10121e;
+    --app-surface: rgba(30, 31, 52, 0.84);
+    --app-surface-solid: #202238;
+    --app-ink: #f5f3ff;
+    --app-muted: #b7b6d0;
+    --app-border: rgba(202, 198, 255, 0.18);
+    --app-shadow: 0 20px 55px rgba(0, 0, 0, 0.34);
+    --app-lilac: #373265;
+    --app-peach: #593746;
+    --app-mint: #1d5149;
+    --app-yellow: #665525;
+    --utterance-active-bg: #37336b;
   }
 }

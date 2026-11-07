@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createPinia, setActivePinia } from 'pinia'
 import { createStenoMock, type StenoMock } from '@/native/steno.mock'
 import { setStenoForTests } from '@/native'
 import { useProcessingStore } from './processing'
@@ -23,7 +22,6 @@ function waitFor(cond: () => boolean, timeoutMs = 5000): Promise<void> {
 describe('processing store + мок', () => {
   let mock: StenoMock
   beforeEach(() => {
-    setActivePinia(createPinia())
     mock = createStenoMock()
     mock.devSetSpeed(200)
     setStenoForTests(mock)
@@ -68,7 +66,6 @@ describe('processing store + мок', () => {
 
 describe('transcript store', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
     setStenoForTests(createStenoMock())
   })
 

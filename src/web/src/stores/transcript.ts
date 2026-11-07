@@ -1,16 +1,14 @@
-import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { getSteno, type ExportFormat, type TranscriptResult, type Utterance } from '@/native'
 import { errorMessage } from '@/utils/errors'
 import { activeUtteranceIndex } from '@/utils/time'
 
-export const useTranscriptStore = defineStore('transcript', () => {
-  const recordingId = ref<string | null>(null)
-  const result = ref<TranscriptResult | null>(null)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-  const positionMs = ref(0)
-  const showCorrected = ref(false)
+const recordingId = ref<string | null>(null)
+const result = ref<TranscriptResult | null>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
+const positionMs = ref(0)
+const showCorrected = ref(false)
 
   /** Что показываем: сырой ASR (по умолчанию) или правку LLM по переключателю. */
   const utterances = computed<Utterance[]>(() => {
@@ -82,6 +80,7 @@ export const useTranscriptStore = defineStore('transcript', () => {
     }
   }
 
+export function useTranscriptStore() {
   return {
     recordingId,
     result,
@@ -101,4 +100,4 @@ export const useTranscriptStore = defineStore('transcript', () => {
     exportAs,
     share,
   }
-})
+}

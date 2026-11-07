@@ -1,30 +1,28 @@
-import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { PluginListenerHandle } from '@capacitor/core'
 import { getSteno, type Recording, type RecordingStatus } from '@/native'
 import { errorCode, errorMessage } from '@/utils/errors'
 
-export const useRecordingsStore = defineStore('recordings', () => {
-  const items = ref<Recording[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-  const isRecording = ref(false)
-  const level = ref(0)
-  const recordStartedAt = ref<number | null>(null)
-  let levelHandle: PluginListenerHandle | null = null
+const items = ref<Recording[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+const isRecording = ref(false)
+const level = ref(0)
+const recordStartedAt = ref<number | null>(null)
+let levelHandle: PluginListenerHandle | null = null
 
-  async function refresh() {
-    loading.value = true
-    error.value = null
-    try {
-      const steno = await getSteno()
-      items.value = (await steno.listRecordings()).items
-    } catch (e) {
-      error.value = errorMessage(e)
-    } finally {
-      loading.value = false
-    }
+async function refresh() {
+  loading.value = true
+  error.value = null
+  try {
+    const steno = await getSteno()
+    items.value = (await steno.listRecordings()).items
+  } catch (e) {
+    error.value = errorMessage(e)
+  } finally {
+    loading.value = false
   }
+}
 
   function upsert(rec: Recording) {
     const i = items.value.findIndex((r) => r.id === rec.id)
@@ -95,6 +93,7 @@ export const useRecordingsStore = defineStore('recordings', () => {
     if (r) r.status = status
   }
 
+export function useRecordingsStore() {
   return {
     items,
     loading,
@@ -110,4 +109,4 @@ export const useRecordingsStore = defineStore('recordings', () => {
     byId,
     setStatus,
   }
-})
+}

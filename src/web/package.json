@@ -20,11 +20,7 @@
   "dependencies": {
     "@capacitor/android": "8.6.0",
     "@capacitor/core": "8.6.0",
-    "@ionic/vue": "9.0.10",
-    "@ionic/vue-router": "9.0.10",
     "@vue/devtools-api": "8.2.1",
-    "ionicons": "8.1.0",
-    "pinia": "4.1.0",
     "vue": "3.5.45",
     "vue-router": "5.4.0"
   },
