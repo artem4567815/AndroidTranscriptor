@@ -42,12 +42,39 @@ async function exportAs(format: ExportFormat) {
     window.setTimeout(() => (toastOpen.value = false), 2200)
   }
 }
-function downloadAudio() {
+async function downloadAudio() {
   if (!audioSrc.value) return
+  const title = recording.value?.title ?? 'recording'
+  const baseName = title.replace(/\.[^/.]+$/, '') || 'recording'
+  let downloadUrl = audioSrc.value
+  let objectUrl: string | null = null
+  let extension = title.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'audio'
+
+  try {
+    const response = await fetch(audioSrc.value)
+    if (!response.ok) throw new Error(`Audio download failed: ${response.status}`)
+    const blob = await response.blob()
+    const mimeExtension: Record<string, string> = {
+      'audio/wav': 'wav',
+      'audio/x-wav': 'wav',
+      'audio/mpeg': 'mp3',
+      'audio/mp4': 'm4a',
+      'audio/ogg': 'ogg',
+      'audio/webm': 'webm',
+    }
+    extension = mimeExtension[blob.type.toLowerCase()] ?? extension
+    objectUrl = URL.createObjectURL(blob)
+    downloadUrl = objectUrl
+  } catch (error) {
+    // Native file URLs may not be fetchable from the WebView; the anchor still works there.
+    console.warn('[transcript] Could not inspect audio format before download', error)
+  }
+
   const link = document.createElement('a')
-  link.href = audioSrc.value
-  link.download = recording.value?.title ?? 'recording'
+  link.href = downloadUrl
+  link.download = `${baseName}.${extension}`
   link.click()
+  if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl as string), 1000)
   downloadOpen.value = false
 }
 function downloadJson() {
