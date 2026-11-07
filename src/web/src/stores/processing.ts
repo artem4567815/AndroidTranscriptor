@@ -82,6 +82,7 @@ async function ensureListeners(): Promise<void> {
     await steno.addListener('failed', (e) => {
       if (e.id !== recordingId.value) return
       running.value = false
+      cancelRequested.value = false
       failure.value = { ...e, text: ru.errors[e.code] ?? ru.errors.UNKNOWN }
       stopTicker()
       useRecordingsStore().setStatus(e.id, e.code === 'CANCELLED' ? 'NEW' : 'ERROR')
