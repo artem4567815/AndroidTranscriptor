@@ -272,21 +272,19 @@ async function removePending() {
   box-shadow: 0 0 0 5px rgba(33, 181, 115, 0.14);
 }
 .recordings-list {
-  display: flex;
+  display: grid;
   gap: 10px;
+  height: clamp(180px, calc(100vh - 420px), 520px);
   margin-top: 20px;
   padding: 2px 2px 12px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  overflow-y: auto;
   scrollbar-width: none;
-  overscroll-behavior-x: contain;
+  overscroll-behavior-y: contain;
 }
 .recordings-list::-webkit-scrollbar {
   display: none;
 }
 .record {
-  flex: 0 0 100%;
-  scroll-snap-align: center;
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto 30px;
   align-items: center;
