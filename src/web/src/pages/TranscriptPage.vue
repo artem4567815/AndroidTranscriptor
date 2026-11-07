@@ -230,13 +230,13 @@ async function saveDetails(title: string, names: Record<string, string>) {
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--app-primary) 40%, transparent);
-  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 58%, transparent);
+  border-radius: 9px;
   color: #fff;
   background: linear-gradient(145deg, var(--app-primary-soft), var(--app-primary));
   box-shadow:
-    0 5px 12px color-mix(in srgb, var(--app-primary) 28%, transparent),
-    0 0 0 3px color-mix(in srgb, var(--app-primary) 10%, transparent);
+    0 3px 7px color-mix(in srgb, var(--app-primary) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 .edit-title-mark svg {
   color: #fff;
