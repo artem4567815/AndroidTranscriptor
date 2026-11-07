@@ -7,8 +7,9 @@ const props = defineProps<{
   title: string
   durationMs: number
   seekToMs: number | null
+  markers?: number[]
 }>()
-const emit = defineEmits<{ position: [ms: number] }>()
+const emit = defineEmits<{ position: [ms: number]; playing: [value: boolean] }>()
 
 const audio = ref<HTMLAudioElement | null>(null)
 const playing = ref(false)
@@ -28,6 +29,18 @@ function seek(ms: number) {
   positionMs.value = ms
   emit('position', ms)
 }
+function seekMarker(direction: -1 | 1) {
+  const markers = props.markers ?? []
+  if (!markers.length) {
+    seek(positionMs.value + direction * 5000)
+    return
+  }
+  const target =
+    direction > 0
+      ? markers.find((marker) => marker > positionMs.value + 60)
+      : [...markers].reverse().find((marker) => marker < positionMs.value - 60)
+  seek(target ?? (direction > 0 ? durationMs.value : 0))
+}
 function onTime() {
   const a = audio.value
   if (!a) return
@@ -37,6 +50,14 @@ function onTime() {
 function onMeta() {
   const d = audio.value?.duration
   if (d && Number.isFinite(d)) durationMs.value = d * 1000
+}
+function onPlay() {
+  playing.value = true
+  emit('playing', true)
+}
+function onPause() {
+  playing.value = false
+  emit('playing', false)
 }
 
 watch(
@@ -59,9 +80,9 @@ defineExpose({ seek })
       preload="metadata"
       @timeupdate="onTime"
       @loadedmetadata="onMeta"
-      @play="playing = true"
-      @pause="playing = false"
-      @ended="playing = false"
+      @play="onPlay"
+      @pause="onPause"
+      @ended="onPause"
     />
     <div class="player-content">
       <div class="track-info">
@@ -69,8 +90,8 @@ defineExpose({ seek })
         <span>{{ formatMs(positionMs) }} / {{ formatMs(durationMs) }}</span>
       </div>
       <div class="player-controls">
-        <button class="player-button skip" aria-label="-5 с" @click="seek(positionMs - 5000)">
-          ↶
+        <button class="player-button skip" aria-label="Предыдущая реплика" @click="seekMarker(-1)">
+          ‹
         </button>
         <button class="player-button main" aria-label="Пуск/пауза" @click="toggle">
           <svg viewBox="0 0 24 24">
@@ -78,8 +99,8 @@ defineExpose({ seek })
             <path v-else d="M8 6v12M16 6v12" />
           </svg>
         </button>
-        <button class="player-button skip" aria-label="+5 с" @click="seek(positionMs + 5000)">
-          ↷
+        <button class="player-button skip" aria-label="Следующая реплика" @click="seekMarker(1)">
+          ›
         </button>
       </div>
     </div>

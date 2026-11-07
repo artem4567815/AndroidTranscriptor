@@ -7,6 +7,8 @@ import UtteranceCard from '@/components/UtteranceCard.vue'
 import { playableSrc, type ExportFormat } from '@/native'
 import { ru } from '@/i18n/ru'
 import ToastMessage from '@/components/ToastMessage.vue'
+import DownloadDialog from '@/components/DownloadDialog.vue'
+import RecordingDetailsDialog from '@/components/RecordingDetailsDialog.vue'
 
 const props = defineProps<{ id: string }>()
 const store = useTranscriptStore()
@@ -16,11 +18,19 @@ const audioSrc = computed(() => (recording.value ? playableSrc(recording.value.a
 const tab = ref<'transcript' | 'protocol'>('transcript')
 const seekToMs = ref<number | null>(null)
 const toastOpen = ref(false)
+const downloadOpen = ref(false)
+const isPlaying = ref(false)
+const detailsOpen = ref(false)
 onMounted(async () => {
   if (!recordings.items.value.length) await recordings.refresh()
   await store.load(props.id)
 })
-watch(store.activeIndex, () => undefined)
+watch([store.activeIndex, isPlaying], ([index, playing]) => {
+  if (!playing || index < 0) return
+  document
+    .querySelector<HTMLElement>(`[data-utterance-index="${index}"]`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+})
 function seek(ms: number) {
   seekToMs.value = ms + Math.random() * 0.001
 }
@@ -34,14 +44,71 @@ async function exportAs(format: ExportFormat) {
     window.setTimeout(() => (toastOpen.value = false), 2200)
   }
 }
+async function downloadAudio() {
+  if (!audioSrc.value) return
+  const title = recording.value?.title ?? 'recording'
+  const baseName = title.replace(/\.[^/.]+$/, '') || 'recording'
+  let downloadUrl = audioSrc.value
+  let objectUrl: string | null = null
+  let extension = title.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'audio'
+
+  try {
+    const response = await fetch(audioSrc.value)
+    if (!response.ok) throw new Error(`Audio download failed: ${response.status}`)
+    const blob = await response.blob()
+    const mimeExtension: Record<string, string> = {
+      'audio/wav': 'wav',
+      'audio/x-wav': 'wav',
+      'audio/mpeg': 'mp3',
+      'audio/mp4': 'm4a',
+      'audio/ogg': 'ogg',
+      'audio/webm': 'webm',
+    }
+    extension = mimeExtension[blob.type.toLowerCase()] ?? extension
+    objectUrl = URL.createObjectURL(blob)
+    downloadUrl = objectUrl
+  } catch (error) {
+    // Native file URLs may not be fetchable from the WebView; the anchor still works there.
+    console.warn('[transcript] Could not inspect audio format before download', error)
+  }
+
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.download = `${baseName}.${extension}`
+  link.click()
+  if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl as string), 1000)
+  downloadOpen.value = false
+}
+function downloadJson() {
+  downloadOpen.value = false
+  void exportAs('json')
+}
+async function saveDetails(title: string, names: Record<string, string>) {
+  recordings.rename(props.id, title)
+  await Promise.all(
+    Object.entries(names).map(([speakerId, name]) => store.renameSpeaker(speakerId, name)),
+  )
+  detailsOpen.value = false
+}
 </script>
 
 <template>
   <div class="page transcript-page">
     <header class="topbar compact">
       <RouterLink class="back-button" to="/library">‹</RouterLink
-      ><span class="topbar-title">{{ recording?.title ?? ru.transcript.title }}</span
-      ><button class="icon-button" @click="exportAs('json')">⇩</button>
+      ><button
+        class="topbar-title title-button"
+        aria-label="Редактировать название и участников"
+        @click="detailsOpen = true"
+      >
+        <span>{{ recording?.title ?? ru.transcript.title }}</span>
+        <i class="edit-title-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="m4 20 4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" />
+            <path d="m13.8 7.2 3 3" />
+          </svg>
+        </i></button
+      ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
       <div class="tabs">
@@ -88,10 +155,27 @@ async function exportAs(format: ExportFormat) {
         :title="recording.title"
         :duration-ms="recording.durationMs"
         :seek-to-ms="seekToMs"
+        :markers="store.utterances.value.map((utterance) => utterance.start_ms)"
         @position="store.positionMs.value = $event"
+        @playing="isPlaying = $event"
       />
     </footer>
     <ToastMessage :open="toastOpen" :message="ru.transcript.exported" />
+    <DownloadDialog
+      :open="downloadOpen"
+      title="Скачать запись"
+      @audio="downloadAudio"
+      @json="downloadJson"
+      @cancel="downloadOpen = false"
+    />
+    <RecordingDetailsDialog
+      :open="detailsOpen"
+      :title="recording?.title ?? ru.transcript.title"
+      :speaker-ids="store.speakerIds.value"
+      :names="store.speakerNames.value"
+      @save="saveDetails"
+      @cancel="detailsOpen = false"
+    />
   </div>
 </template>
 
@@ -108,6 +192,59 @@ async function exportAs(format: ExportFormat) {
   border: 1px solid var(--app-border);
   border-radius: 15px;
   background: var(--app-surface);
+}
+.title-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: min(70%, 360px);
+  overflow: hidden;
+  padding: 0 8px;
+  border: 0;
+  color: var(--app-ink);
+  background: transparent;
+  font-size: 17px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.title-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.title-button svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  color: var(--app-primary);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.edit-title-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 58%, transparent);
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--app-primary-soft), var(--app-primary));
+  box-shadow:
+    0 3px 7px color-mix(in srgb, var(--app-primary) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.edit-title-mark svg {
+  color: #fff;
+  stroke-width: 2.2;
+}
+.title-button:active {
+  opacity: 0.7;
+  transform: scale(0.98);
 }
 .tabs button {
   padding: 11px;

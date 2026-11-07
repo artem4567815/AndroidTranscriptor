@@ -112,11 +112,12 @@ a {
   align-items: center;
   justify-content: space-between;
   width: min(100% - 32px, 680px);
-  min-height: 78px;
+  min-height: calc(78px + max(24px, env(safe-area-inset-top)));
   margin: 0 auto;
+  padding-top: max(24px, env(safe-area-inset-top));
 }
 .topbar.compact {
-  min-height: 64px;
+  min-height: calc(74px + max(24px, env(safe-area-inset-top)));
 }
 .topbar-title {
   max-width: 70%;

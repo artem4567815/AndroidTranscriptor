@@ -10,13 +10,31 @@ const isRecording = ref(false)
 const level = ref(0)
 const recordStartedAt = ref<number | null>(null)
 let levelHandle: PluginListenerHandle | null = null
+const titleOverrides = new Map<string, string>()
+
+function loadTitleOverrides() {
+  if (typeof localStorage === 'undefined') return
+  try {
+    const saved = JSON.parse(localStorage.getItem('steno-title-overrides') ?? '{}') as Record<
+      string,
+      string
+    >
+    Object.entries(saved).forEach(([id, title]) => titleOverrides.set(id, title))
+  } catch {
+    titleOverrides.clear()
+  }
+}
+loadTitleOverrides()
 
 async function refresh() {
   loading.value = true
   error.value = null
   try {
     const steno = await getSteno()
-    items.value = (await steno.listRecordings()).items
+    items.value = (await steno.listRecordings()).items.map((item) => ({
+      ...item,
+      title: titleOverrides.get(item.id) ?? item.title,
+    }))
   } catch (e) {
     error.value = errorMessage(e)
   } finally {
@@ -93,6 +111,21 @@ function setStatus(id: string, status: RecordingStatus) {
   if (r) r.status = status
 }
 
+function rename(id: string, title: string) {
+  const cleanTitle = title.trim()
+  const recording = byId(id)
+  if (!recording || !cleanTitle) return false
+  recording.title = cleanTitle
+  titleOverrides.set(id, cleanTitle)
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(
+      'steno-title-overrides',
+      JSON.stringify(Object.fromEntries(titleOverrides)),
+    )
+  }
+  return true
+}
+
 export function useRecordingsStore() {
   return {
     items,
@@ -108,5 +141,6 @@ export function useRecordingsStore() {
     remove,
     byId,
     setStatus,
+    rename,
   }
 }

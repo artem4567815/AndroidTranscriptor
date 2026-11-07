@@ -42,6 +42,7 @@ onBeforeUnmount(up)
 <template>
   <div
     class="utterance"
+    :data-utterance-index="index"
     :class="{ active }"
     :style="{ '--u-color': color }"
     role="button"
