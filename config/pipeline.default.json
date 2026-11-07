@@ -1,0 +1,13 @@
+{
+  "numSpeakers": 0,
+  "clusterThreshold": 0.5,
+  "mergeGapMs": 700,
+  "maxSegmentMs": 20000,
+  "segmentPaddingMs": 150,
+  "minUtteranceMs": 200,
+  "numThreads": 4,
+  "enableDenoise": false,
+  "enableLlmProtocol": true,
+  "enableLlmCorrection": false,
+  "vadThreshold": 0.5
+}

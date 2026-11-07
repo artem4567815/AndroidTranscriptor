@@ -1,0 +1,106 @@
+# =====================================================================
+#  Нейро-стенографист — что НЕ попадает в git
+#  Всё ниже генерируется сборкой, скачивается скриптами или личное.
+# =====================================================================
+
+### Системный мусор ###
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+*.log
+*.tmp
+*.bak
+
+### IDE и инструменты ###
+# Android Studio / IntelliJ: общие настройки стиля кода оставляем, остальное — личное
+.idea/*
+!.idea/codeStyles/
+!.idea/inspectionProfiles/
+*.iml
+*.ipr
+*.iws
+out/
+.vscode/
+.fleet/
+.cursor/
+# Локальные настройки Claude Code (launch.json, settings.local.json)
+.claude/
+# Eclipse / NetBeans
+.classpath
+.project
+.settings/
+.factorypath
+.apt_generated
+nbproject/private/
+
+### Секреты и личные файлы — только вне git ###
+local.properties
+keystore.properties
+*.jks
+*.keystore
+*.pem
+*.p12
+.env
+.env.*
+!.env.example
+google-services.json
+
+### Gradle / Android / Kotlin ###
+build/
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+captures/
+*.hprof
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+# Wrapper Gradle нужен в git
+!gradle/wrapper/gradle-wrapper.jar
+
+### Сгенерированные Capacitor (создаёт `npx cap sync`) ###
+src/android/app/src/main/assets/public/
+src/android/app/src/main/assets/capacitor.config.json
+src/android/app/src/main/assets/capacitor.plugins.json
+src/android/app/src/main/res/xml/config.xml
+src/android/capacitor-cordova-android-plugins/
+
+### Модели и нативные библиотеки (скачиваются scripts/*.sh) ###
+src/android/app/src/main/assets/models/**
+!src/android/app/src/main/assets/models/manifest.json
+!src/android/app/src/main/assets/models/README.md
+src/android/ml/sherpa/src/main/jniLibs/
+
+### Vue / Node ###
+node_modules/
+src/web/dist/
+src/web/coverage/
+.vite/
+.eslintcache
+*.tsbuildinfo
+npm-debug.log*
+
+### Python-стенд ###
+src/eval/data/
+src/eval/out/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+### Артефакты релиза (APK публикуется в GitHub Releases) ###
+artifacts/apk/
+
+### Исходный промпт в корне (копия лежит в docs/AGENT_PROMPT.md) ###
+/Промпт*.md

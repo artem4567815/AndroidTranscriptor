@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "files": [
+    {
+      "id": "asr.encoder",
+      "path": "asr/encoder.int8.onnx",
+      "sizeBytes": 0,
+      "sha256": "",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-transducer-punct-giga-am-v3-russian-2025-12-16.tar.bz2",
+      "license": "MIT",
+      "purpose": "ASR: GigaAM v3 e2e (транcдьюсер с пунктуацией), энкодер int8",
+      "version": "v3-2025-12-16",
+      "required": true
+    },
+    {
+      "id": "asr.decoder",
+      "path": "asr/decoder.onnx",
+      "sizeBytes": 0,
+      "sha256": "",
+      "source": "см. asr.encoder",
+      "license": "MIT",
+      "purpose": "ASR: GigaAM v3 e2e, декодер",
+      "version": "v3-2025-12-16",
+      "required": true
+    },
+    {
+      "id": "asr.joiner",
+      "path": "asr/joiner.onnx",
+      "sizeBytes": 0,
+      "sha256": "",
+      "source": "см. asr.encoder",
+      "license": "MIT",
+      "purpose": "ASR: GigaAM v3 e2e, joiner",
+      "version": "v3-2025-12-16",
+      "required": true
+    },
+    {
+      "id": "asr.tokens",
+      "path": "asr/tokens.txt",
+      "sizeBytes": 0,
+      "sha256": "",
+      "source": "см. asr.encoder",
+      "license": "MIT",
+      "purpose": "ASR: словарь токенов",
+      "version": "v3-2025-12-16",
+      "required": true
+    },
+    {
+      "id": "vad",
+      "path": "vad/silero_vad.onnx",
+      "sizeBytes": 643854,
+      "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "license": "MIT",
+      "purpose": "VAD: Silero",
+      "version": "sherpa-onnx asr-models",
+      "required": true
+    },
+    {
+      "id": "diarization.segmentation",
+      "path": "diarization/segmentation.onnx",
+      "sizeBytes": 0,
+      "sha256": "",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
+      "license": "MIT",
+      "purpose": "Диаризация: pyannote-segmentation-3.0",
+      "version": "3.0",
+      "required": true
+    },
+    {
+      "id": "diarization.embedding",
+      "path": "diarization/embedding.onnx",
+      "sizeBytes": 28281138,
+      "sha256": "",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",
+      "license": "Apache-2.0",
+      "purpose": "Диаризация: эмбеддинги спикеров 3D-Speaker CAM++",
+      "version": "16k-common",
+      "required": true
+    },
+    {
+      "id": "llm",
+      "path": "llm/model.litertlm",
+      "sizeBytes": 0,
+      "sha256": "",
+      "source": "TODO(роль 4): https://huggingface.co/litert-community — выбрать Gemma 4 E2B или Qwen2.5-0.5B в формате .litertlm",
+      "license": "см. карточку модели",
+      "purpose": "LLM: протокол, роли спикеров, правка текста (опционально)",
+      "version": "",
+      "required": false
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+name: android
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26  # текущий LTS
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Vue — install, lint, test, build
+        working-directory: src/web
+        run: |
+          npm ci
+          npm run lint
+          npm run test
+          npm run build
+          npm run check:no-mock
+
+      - name: Capacitor sync
+        working-directory: src/web
+        run: npx cap sync android
+
+      # Модели и .so sherpa-onnx в CI не нужны: модули компилируются без них.
+      - name: Android — assembleDebug и unit-тесты
+        working-directory: src/android
+        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest :core:model:test
+
+      - name: Отчёты тестов
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            src/android/**/build/reports/tests/
+          retention-days: 7

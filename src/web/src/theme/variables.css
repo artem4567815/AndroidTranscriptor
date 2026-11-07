@@ -1,0 +1,36 @@
+/* Тема на CSS-переменных Ionic. Тёмная тема — по системной настройке (dark.system.css). */
+:root {
+  --ion-color-primary: #3a5bd9;
+  --ion-color-primary-rgb: 58, 91, 217;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #3350bf;
+  --ion-color-primary-tint: #4e6bdd;
+
+  /* Палитра из 8 цветов спикеров, подобрана под контраст на светлом фоне. */
+  --speaker-1: #3a5bd9;
+  --speaker-2: #d9480f;
+  --speaker-3: #2b8a3e;
+  --speaker-4: #ae3ec9;
+  --speaker-5: #0b7285;
+  --speaker-6: #c2255c;
+  --speaker-7: #8f6a00;
+  --speaker-8: #5f3dc4;
+
+  --utterance-active-bg: rgba(58, 91, 217, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --speaker-1: #91a7ff;
+    --speaker-2: #ffa94d;
+    --speaker-3: #8ce99a;
+    --speaker-4: #e599f7;
+    --speaker-5: #66d9e8;
+    --speaker-6: #faa2c1;
+    --speaker-7: #ffe066;
+    --speaker-8: #b197fc;
+
+    --utterance-active-bg: rgba(145, 167, 255, 0.16);
+  }
+}

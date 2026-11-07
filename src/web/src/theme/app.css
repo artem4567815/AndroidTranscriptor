@@ -1,0 +1,16 @@
+.muted {
+  color: var(--ion-color-medium);
+}
+.center-block {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Длинные подписи переключателей и выпадающих списков переносятся, а не обрезаются. */
+ion-toggle::part(label),
+ion-select::part(label) {
+  white-space: normal;
+}

@@ -1,0 +1,51 @@
+# Версии Android-зависимостей. Проверены по Maven Central / Google Maven 2026-11-06.
+# AGP задаёт Capacitor 8.6.0 (его модули прописывают 8.13.0 в своём buildscript) — не поднимать отдельно.
+[versions]
+agp = "8.13.0"
+kotlin = "2.4.21"
+ksp = "2.3.13"
+coroutines = "1.11.0"
+serialization = "1.12.0"
+room = "2.8.5"
+koin = "4.2.2"
+datastore = "1.3.0"
+# 1.18+ требует compileSdk 37 и AGP 9.1 — держим версию Capacitor (variables.gradle)
+androidxCore = "1.17.0"
+lifecycle = "2.11.0"
+documentfile = "1.1.0"
+junit = "4.13.2"
+robolectric = "4.17"
+# Подключает роль 4 (ml/llm); версия проверена в Google Maven, пока не используется.
+litertlm = "0.19.1"
+# sherpa-onnx подключается не через Maven, а скриптом scripts/fetch_sherpa.sh (см. docs/MODELS.md).
+sherpaOnnx = "2.0.1"
+
+[libraries]
+# Gradle-плагины для buildscript корневого build.gradle (Groovy, сгенерирован Capacitor)
+android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+kotlin-serializationPlugin = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
+ksp-gradlePlugin = { module = "com.google.devtools.ksp:symbol-processing-gradle-plugin", version.ref = "ksp" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
+androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
+koin-test = { module = "io.insert-koin:koin-test", version.ref = "koin" }
+
+junit = { module = "junit:junit", version.ref = "junit" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }

@@ -1,0 +1,31 @@
+// Top-level build file. Сгенерирован Capacitor; добавлены Kotlin, KSP и kotlinx.serialization.
+// Плагины подключаются через buildscript, потому что модули Capacitor делают так же (AGP 8.13.0).
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath libs.android.gradlePlugin
+        classpath libs.kotlin.gradlePlugin
+        classpath libs.kotlin.serializationPlugin
+        classpath libs.ksp.gradlePlugin
+
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.layout.buildDirectory
+}

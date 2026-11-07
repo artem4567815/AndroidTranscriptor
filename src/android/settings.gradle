@@ -1,0 +1,18 @@
+rootProject.name = 'neuro-stenographer'
+
+include ':app'
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
+
+apply from: 'capacitor.settings.gradle'
+
+// Наши модули (Kotlin DSL). Правила зависимостей — docs/ARCHITECTURE.md.
+include ':core:model'
+include ':core:audio'
+include ':core:data'
+include ':ml:runtime'
+include ':ml:sherpa'
+include ':ml:asr'
+include ':ml:diarization'
+include ':ml:llm'
+include ':pipeline'

@@ -1,0 +1,7 @@
+# Python-стенд оценки. Версии проверены на PyPI 2026-11-06. Python >= 3.12.
+sherpa-onnx==2.0.1
+numpy==2.5.4
+soundfile==0.14.0
+jiwer==4.0.0
+pyannote.core==6.1.0
+pyannote.metrics==4.2.0
