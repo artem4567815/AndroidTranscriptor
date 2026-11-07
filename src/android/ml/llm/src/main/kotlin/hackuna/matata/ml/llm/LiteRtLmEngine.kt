@@ -6,37 +6,82 @@ import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.StenoException
 import hackuna.matata.ml.runtime.ModelManager
 
+import com.google.ai.edge.litertlm.Backend
+import com.google.ai.edge.litertlm.Engine
+import com.google.ai.edge.litertlm.EngineConfig
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.withContext
+
 object LlmModelIds {
     const val MODEL = "llm"
 }
 
-/**
- * Локальная LLM через LiteRT-LM (Kotlin API, без своего C++).
- * Основной кандидат — Gemma 4 E2B; если APK не влезает — меньшая модель, поддерживаемая LiteRT-LM.
- *
- * TODO(роль 4):
- *  - добавить implementation(libs.litertlm.android) в ml/llm/build.gradle.kts (версия в libs.versions.toml);
- *  - создать Engine(EngineConfig(modelPath = models.require(LlmModelIds.MODEL), backend = CPU)) и initialize();
- *  - generate(): открыть Conversation/Session, отправить prompt, собрать ответ, ограничить maxTokens;
- *  - close(): закрыть Conversation и Engine — освободить память сразу после этапа LLM.
- *  Точные имена классов сверить с документацией LiteRT-LM:
- *  https://github.com/google-ai-edge/LiteRT-LM (раздел Kotlin API).
- */
 class LiteRtLmEngine(
     private val models: ModelManager,
     @Suppress("unused") private val config: PipelineConfig,
 ) : LlmEngine {
+
+    // Загруженная языковая модель
+    private var engine: Engine? = null
+
     init {
         if (models.path(LlmModelIds.MODEL) == null) {
-            throw StenoException(ErrorCode.MODELS_MISSING, "LLM-модель не установлена")
+            throw StenoException(
+                ErrorCode.MODELS_MISSING,
+                "LLM-модель не установлена"
+            )
         }
     }
 
-    override suspend fun generate(prompt: String, maxTokens: Int): String {
-        throw NotImplementedError("TODO(роль 4): генерация через LiteRT-LM")
+    override suspend fun generate(
+        prompt: String,
+        maxTokens: Int
+    ): String = withContext(Dispatchers.IO) {
+
+        // Проверяем входные данные
+        require(prompt.isNotBlank()) {
+            "Текст запроса пустой"
+        }
+
+        require(maxTokens > 0) {
+            "maxTokens должен быть больше нуля"
+        }
+
+        // Загружаем модель, если она ещё не загружена
+        val currentEngine = engine ?: Engine(
+            EngineConfig(
+                modelPath = models.require(LlmModelIds.MODEL),
+                backend = Backend.CPU()
+            )
+        ).also { newEngine ->
+            newEngine.initialize()
+            engine = newEngine
+        }
+
+        // Создаём диалог с моделью
+        currentEngine.createConversation().use { conversation ->
+
+            val result = StringBuilder()
+
+            // Отправляем запрос и получаем ответ
+            conversation.sendMessageAsync(
+                prompt,
+                maxOutputToken = maxTokens
+            ).collect { message ->
+
+                result.append(message.toString())
+            }
+
+            // Возвращаем готовый текст
+            result.toString().trim()
+        }
     }
 
     override fun close() {
-        // TODO(роль 4): engine.close()
+        engine?.close()
+        engine = null
     }
 }
+
