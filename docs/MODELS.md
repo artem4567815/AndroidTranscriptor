@@ -11,7 +11,7 @@
 | VAD | Silero VAD | `vad/silero_vad.onnx` | 0,6 МБ | fp32 | MIT | `asr-models/silero_vad.onnx` |
 | Сегментация | pyannote-segmentation-3.0 | `diarization/segmentation.onnx` | ~6 МБ | int8, если есть в архиве | MIT | [speaker-segmentation-models](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-segmentation-models) |
 | Эмбеддинги | 3D-Speaker CAM++ zh-cn 16k common (`campplus_sv_zh-cn_16k-common`) | `diarization/embedding.onnx` | 28 МБ | fp32 | Apache-2.0 | [speaker-recongition-models](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models) |
-| LLM | Gemma 4 E2B (или Qwen2.5-0.5B, если APK не влезает) | `llm/model.litertlm` | TODO | int4/int8 | см. карточку модели | TODO(роль 4): [litert-community на HF](https://huggingface.co/litert-community) |
+| LLM | Qwen3-1.7B (Alibaba), формат LiteRT-LM | `llm/model.litertlm` | 977 МБ | веса int4 (`dynamic_wi4b32_afp32`) | Apache-2.0 | [litert-community/Qwen3-1.7B](https://huggingface.co/litert-community/Qwen3-1.7B): `Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm`, sha256 `2a72330b504a6596d53a2c00923c57173b10f1b83e6a541213ffec08d1fc5de8` |
 
 sha256, проверенные на GitHub (2026-11-06): GigaAM v3 punct transducer —
 `f9620a0099019c6afcee26525ef9ed3297fa50dd5691c1902af0c948fc1a470b`; silero_vad.onnx —
@@ -36,7 +36,7 @@ CTC-вариант GigaAM v3 punct (`sherpa-onnx-nemo-ctc-punct-giga-am-v3-russi
 | Компонент | Версия | Как подключён |
 |---|---|---|
 | sherpa-onnx | **2.0.1** | `scripts/fetch_sherpa.sh`: `libsherpa-onnx-jni.so` + `libonnxruntime.so` (arm64-v8a) в `ml/sherpa/src/main/jniLibs/` (в .gitignore), официальные Kotlin API-файлы в `ml/sherpa/src/main/kotlin/com/k2fsa/sherpa/onnx/` (коммитятся, Apache-2.0, лицензия рядом) |
-| LiteRT-LM | `com.google.ai.edge.litertlm:litertlm-android:0.19.1` (Google Maven) | объявлен в `libs.versions.toml`, подключает роль 4 |
+| LiteRT-LM | `com.google.ai.edge.litertlm:litertlm-android:0.19.1` (Google Maven) | `ml/llm`, Kotlin API (`Engine`, `Conversation`), +23 МБ нативной библиотеки arm64 |
 
 Почему не AAR sherpa-onnx: релиз публикует `sherpa-onnx-2.0.1.aar` (49 МБ) только на GitHub, не в Maven;
 локальный AAR внутри library-модуля AGP не позволяет собрать (`bundleAar`), а `.so` + исходники Kotlin API
@@ -44,5 +44,24 @@ CTC-вариант GigaAM v3 punct (`sherpa-onnx-nemo-ctc-punct-giga-am-v3-russi
 
 ## Размер APK
 
-Цель — < 2 ГБ (лимит GitHub Releases). Оценка: нативные библиотеки ~27 МБ, ASR ~170 МБ,
-диаризация ~35 МБ, LLM 0,5–2 ГБ. Если Gemma 4 E2B не влезает — Qwen2.5-0.5B.
+Цель — < 2 ГБ (лимит GitHub Releases). Факт: APK без LLM ~0,29 ГБ, с Qwen3-1.7B — **1,3 ГБ**.
+На телефоне после первого запуска: копия моделей в `filesDir/models` (~1,2 ГБ) + кэш весов LLM
+в `cacheDir/litertlm` (~0,95 ГБ, создаётся при первой обработке с протоколом).
+
+## Выбор LLM (2026-11-07)
+
+Задача LLM — протокол заседания и роли участников по расшифровке на русском, на CPU телефона, офлайн.
+Сравнение на Mac (CPU, 4 потока, LiteRT-LM 0.19.1, один и тот же промпт; подробности — docs/TESTS.md):
+
+| Модель | Размер | Скорость | Качество протокола |
+|---|---|---|---|
+| **Qwen3-1.7B int4** | 977 МБ | разбор промпта ~90 ток/с, генерация ~18 ток/с | планёрка: участники, вопросы, решения и поручения со сроками верны; одна выдуманная дата |
+| Qwen3.5-0.8B int8 | 965 МБ | ~2× быстрее | непригодна: зацикливается («24 одинаковых пункта»), повторяет инструкцию вместо протокола |
+| Qwen3.5-0.8B `dynamic_wi8` (рекомендованный файл) | 791 МБ | — | не запускается: нужен LiteRT-LM ≥ 0.20, а последний релиз — 0.19.1 |
+| Gemma 4 E2B | 2,6 ГБ | — | не подходит по размеру: APK > 2 ГБ |
+
+Почему Qwen3 без «размышлений»: по умолчанию Qwen3 сначала «думает вслух» (сотни токенов, минуты на
+телефоне), в приложении это выключено (`ThinkingConfig(enableThinking = false)`).
+
+Память: кэш весов (`cacheDir`) обязателен. Без него LiteRT держит в ОЗУ и исходные, и переупакованные
+веса — пик 4,6 ГБ против 2,1 ГБ с кэшем (Mac), а на эмуляторе с 4 ГБ приложение убивала система.

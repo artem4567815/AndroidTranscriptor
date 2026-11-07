@@ -17,7 +17,6 @@ class DefaultAudioPreprocessor(
         val s = audio.samples
         if (s.isEmpty()) return audio
         // DC-фильтр первого порядка: y[n] = x[n] - x[n-1] + R * y[n-1]
-        val out = FloatArray(s.size)
         val r = 0.995f
         var prevX = 0f
         var prevY = 0f
@@ -26,13 +25,13 @@ class DefaultAudioPreprocessor(
             val y = s[i] - prevX + r * prevY
             prevX = s[i]
             prevY = y
-            out[i] = y
+            s[i] = y
             peak = maxOf(peak, abs(y))
         }
         if (peak > 1e-6f) {
             val gain = (targetPeak / peak).coerceAtMost(maxGain)
-            for (i in out.indices) out[i] = (out[i] * gain).coerceIn(-1f, 1f)
+            for (i in s.indices) s[i] = (s[i] * gain).coerceIn(-1f, 1f)
         }
-        return PcmAudio(out, audio.sampleRate)
+        return audio
     }
 }

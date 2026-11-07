@@ -31,6 +31,9 @@ interface StenoDao {
     @Query("UPDATE recordings SET status = :to WHERE status = :from")
     suspend fun replaceStatus(from: String, to: String): Int
 
+    @Query("UPDATE recordings SET status = :to WHERE status = :from AND id IN (SELECT recordingId FROM results)")
+    suspend fun replaceStatusWithResult(from: String, to: String): Int
+
     @Query("SELECT * FROM utterances WHERE recordingId = :id AND variant = :variant ORDER BY idx")
     suspend fun utterances(id: String, variant: Int): List<UtteranceEntity>
 

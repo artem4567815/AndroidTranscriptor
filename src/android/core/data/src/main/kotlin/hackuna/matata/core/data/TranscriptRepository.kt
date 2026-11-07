@@ -24,9 +24,14 @@ interface TranscriptRepository {
     suspend fun deleteRecording(id: String)
     suspend fun setStatus(id: String, status: RecordingStatus, code: ErrorCode? = null, message: String? = null)
 
-    /** После убийства процесса статус PROCESSING «застревает» — переводим такие записи в ERROR. */
+    /**
+     * После убийства процесса статус PROCESSING «застревает»: записи с сохранённым результатом
+     * (например, расшифровка готова, а процесс убили на этапе LLM) → DONE, остальные → ERROR.
+     */
     suspend fun resetStaleProcessing(): Int
-    suspend fun saveResult(id: String, result: TranscriptionResult)
+
+    /** [final] = false — черновик (расшифровка до LLM): статус остаётся PROCESSING. */
+    suspend fun saveResult(id: String, result: TranscriptionResult, final: Boolean = true)
     suspend fun getResult(id: String): StoredResult?
     suspend fun updateUtterance(id: String, index: Int, text: String?, speakerId: String?)
     suspend fun renameSpeaker(id: String, speakerId: String, name: String)
@@ -52,9 +57,10 @@ class RoomTranscriptRepository(private val dao: StenoDao) : TranscriptRepository
         dao.setStatus(id, status.name, code?.name, message)
 
     override suspend fun resetStaleProcessing(): Int =
-        dao.replaceStatus(RecordingStatus.PROCESSING.name, RecordingStatus.ERROR.name)
+        dao.replaceStatusWithResult(RecordingStatus.PROCESSING.name, RecordingStatus.DONE.name) +
+            dao.replaceStatus(RecordingStatus.PROCESSING.name, RecordingStatus.ERROR.name)
 
-    override suspend fun saveResult(id: String, result: TranscriptionResult) {
+    override suspend fun saveResult(id: String, result: TranscriptionResult, final: Boolean) {
         val rows = result.transcript.transcript.toRows(id, UtteranceEntity.RAW) +
             (result.llmCorrected?.transcript?.toRows(id, UtteranceEntity.LLM) ?: emptyList())
         val entity = ResultEntity(
@@ -65,7 +71,7 @@ class RoomTranscriptRepository(private val dao: StenoDao) : TranscriptRepository
             audioDurationMs = result.audioDurationMs,
             hasLlmCorrection = result.llmCorrected != null,
         )
-        dao.replaceResult(entity, rows, RecordingStatus.DONE.name)
+        dao.replaceResult(entity, rows, if (final) RecordingStatus.DONE.name else RecordingStatus.PROCESSING.name)
     }
 
     override suspend fun getResult(id: String): StoredResult? {

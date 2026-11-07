@@ -33,7 +33,7 @@ JSON экспортируется строго в формате организ�
 
 ```bash
 scripts/fetch_sherpa.sh          # .so и Kotlin API sherpa-onnx
-scripts/download_models.sh       # модели в assets/models
+scripts/download_models.sh --with-llm   # модели в assets/models (+ LLM Qwen3-1.7B для протокола)
 cd src/web && npm ci && npm run build && npx cap sync android
 cd ../android && ./gradlew assembleDebug        # или assembleRelease
 ```

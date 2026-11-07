@@ -3,7 +3,7 @@
 # (размеры и sha256 фактических файлов). ТОЛЬКО для разработки: приложение моделей из сети не качает.
 #
 #   scripts/download_models.sh            # ASR + VAD + диаризация
-#   scripts/download_models.sh --with-llm # + LLM (нужен URL, см. TODO ниже)
+#   scripts/download_models.sh --with-llm # + LLM Qwen3-1.7B (977 МБ, протокол заседания)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -63,12 +63,13 @@ fetch "$REL/speaker-recongition-models/$EMBEDDING" "$DEST/diarization/embedding.
 
 # 4. LLM (роль 4)
 if [[ "${1:-}" == "--with-llm" ]]; then
-  # TODO(роль 4): выбрать модель .litertlm (Gemma 4 E2B или Qwen2.5-0.5B) на https://huggingface.co/litert-community
-  # и вписать прямой URL и sha256. Некоторые модели требуют принять лицензию на HF — скачать вручную.
-  LLM_URL="${LLM_URL:-}"
-  if [[ -z "$LLM_URL" ]]; then
-    echo "LLM_URL не задан: LLM_URL=<прямая ссылка на .litertlm> $0 --with-llm" >&2
-    exit 1
+  # Qwen3-1.7B, веса int4, формат LiteRT-LM (Apache-2.0). Почему она — docs/MODELS.md.
+  # Другую модель можно подставить: LLM_URL=<прямая ссылка на .litertlm> LLM_SHA256=<sha256> $0 --with-llm
+  LLM_DEFAULT_URL="https://huggingface.co/litert-community/Qwen3-1.7B/resolve/main/Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm"
+  LLM_DEFAULT_SHA256="2a72330b504a6596d53a2c00923c57173b10f1b83e6a541213ffec08d1fc5de8"
+  if [[ -z "${LLM_URL:-}" ]]; then
+    LLM_URL="$LLM_DEFAULT_URL"
+    LLM_SHA256="${LLM_SHA256:-$LLM_DEFAULT_SHA256}"
   fi
   fetch "$LLM_URL" "$DEST/llm/model.litertlm" "${LLM_SHA256:-}"
 fi

@@ -53,7 +53,7 @@
 | `ml/sherpa`: `.so` v2.0.1 + официальные Kotlin API, `SherpaRuntime` | ✅ подключено (скриптом) | роль 2 |
 | `ml/asr`: `GigaAmSpeechRecognizer` | ⏳ заглушка `NotImplementedError("TODO(роль 2)…")`, проверка путей моделей есть | роль 2 |
 | `ml/diarization`: `SileroVoiceActivityDetector`, `SherpaDiarizer` | ⏳ заглушки (роль 3) | роль 3 |
-| `ml/llm`: `LiteRtLmEngine` | ⏳ заглушка (роль 4) | роль 4 |
+| `ml/llm`: `LiteRtLmEngine` | ✅ Qwen3-1.7B на LiteRT-LM 0.19.1 (2026-11-07) | роль 4 |
 | `ml/llm`: `LlmTranscriptPostProcessor` (промпты, разбор ролей, защита правки) | ✅ полностью, тесты | роль 4 |
 | `pipeline`: `DefaultTranscriptionPipeline`, `SegmentPlanner`, `UtteranceMerger` | ✅ полностью, тесты | роль 3 |
 | `app`: `StenoPlugin` (все методы контракта), контроллер, Foreground Service, импорт/экспорт/шаринг через системные диалоги, разрешения, Koin | ✅ полностью; на телефоне не проверено | роль 3 |
@@ -94,7 +94,7 @@
 | DataStore | 1.3.0 | Google Maven |
 | androidx.core | 1.17.0 | Google Maven (1.19.1 требует compileSdk 37 + AGP 9.1) |
 | lifecycle-service / documentfile | 2.11.0 / 1.1.0 | Google Maven |
-| LiteRT-LM | 0.19.1 (`com.google.ai.edge.litertlm:litertlm-android`) | Google Maven, ещё не подключён |
+| LiteRT-LM | 0.19.1 (`com.google.ai.edge.litertlm:litertlm-android`) | Google Maven, подключён в `ml/llm` |
 | sherpa-onnx | 2.0.1 (Android tar, sha256 из GitHub API) | GitHub Releases |
 | Vue / Vite / TypeScript / vue-tsc | 3.5.45 / 8.3.6 / 6.0.3 / 3.3.14 | npm (TS 7 не поддерживает typescript-eslint, нужен < 6.1) |
 | Ionic Vue / vue-router / Pinia | 9.0.10 / 5.4.0 / 4.1.0 | npm |
@@ -108,7 +108,7 @@
 # Нативные библиотеки и модели (разработчикам, нужен интернет)
 scripts/fetch_sherpa.sh
 scripts/download_models.sh            # ASR, VAD, диаризация (~210 МБ)
-LLM_URL=<ссылка> scripts/download_models.sh --with-llm
+scripts/download_models.sh --with-llm   # Qwen3-1.7B; другая модель: LLM_URL=<ссылка> LLM_SHA256=<sha>
 
 # Vue
 cd src/web && npm ci && npm run lint && npm run test && npm run build && npx cap sync android
