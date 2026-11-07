@@ -31,7 +31,7 @@
   --utterance-active-bg: #edeaff;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   --app-bg: #10121e;
   --app-surface: rgba(30, 31, 52, 0.84);
   --app-surface-solid: #202238;
@@ -47,7 +47,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root[data-theme="system"] {
+  :root[data-theme='system'] {
     --app-bg: #10121e;
     --app-surface: rgba(30, 31, 52, 0.84);
     --app-surface-solid: #202238;

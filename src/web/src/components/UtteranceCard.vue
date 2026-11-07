@@ -81,7 +81,9 @@ onBeforeUnmount(up)
 }
 .utterance.active {
   background: var(--utterance-active-bg);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--u-color) 20%, transparent), 0 0 0 1px color-mix(in srgb, var(--u-color) 35%, transparent);
+  box-shadow:
+    0 10px 26px color-mix(in srgb, var(--u-color) 20%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--u-color) 35%, transparent);
   transform: translateX(3px);
 }
 .head {

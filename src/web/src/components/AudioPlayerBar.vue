@@ -2,7 +2,12 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { formatMs } from '@/utils/time'
 
-const props = defineProps<{ src: string; title: string; durationMs: number; seekToMs: number | null }>()
+const props = defineProps<{
+  src: string
+  title: string
+  durationMs: number
+  seekToMs: number | null
+}>()
 const emit = defineEmits<{ position: [ms: number] }>()
 
 const audio = ref<HTMLAudioElement | null>(null)
@@ -64,12 +69,30 @@ defineExpose({ seek })
         <span>{{ formatMs(positionMs) }} / {{ formatMs(durationMs) }}</span>
       </div>
       <div class="player-controls">
-        <button class="player-button skip" aria-label="-5 с" @click="seek(positionMs - 5000)">↶</button>
-        <button class="player-button main" aria-label="Пуск/пауза" @click="toggle"><svg viewBox="0 0 24 24"><path v-if="!playing" d="m9 6 9 6-9 6V6Z" /><path v-else d="M8 6v12M16 6v12" /></svg></button>
-        <button class="player-button skip" aria-label="+5 с" @click="seek(positionMs + 5000)">↷</button>
+        <button class="player-button skip" aria-label="-5 с" @click="seek(positionMs - 5000)">
+          ↶
+        </button>
+        <button class="player-button main" aria-label="Пуск/пауза" @click="toggle">
+          <svg viewBox="0 0 24 24">
+            <path v-if="!playing" d="m9 6 9 6-9 6V6Z" />
+            <path v-else d="M8 6v12M16 6v12" />
+          </svg>
+        </button>
+        <button class="player-button skip" aria-label="+5 с" @click="seek(positionMs + 5000)">
+          ↷
+        </button>
       </div>
     </div>
-    <input class="seek-range" type="range" min="0" :max="Math.max(1, durationMs)" :value="positionMs" :style="{ '--progress': `${Math.min(100, (positionMs / Math.max(1, durationMs)) * 100)}%` }" aria-label="Позиция" @input="seek(Number(($event.target as HTMLInputElement).value))" />
+    <input
+      class="seek-range"
+      type="range"
+      min="0"
+      :max="Math.max(1, durationMs)"
+      :value="positionMs"
+      :style="{ '--progress': `${Math.min(100, (positionMs / Math.max(1, durationMs)) * 100)}%` }"
+      aria-label="Позиция"
+      @input="seek(Number(($event.target as HTMLInputElement).value))"
+    />
   </div>
 </template>
 
@@ -128,9 +151,11 @@ defineExpose({ seek })
   height: 52px;
   color: #fff;
   background: linear-gradient(145deg, var(--app-primary-soft), var(--app-primary));
-  box-shadow: 0 8px 18px rgba(97,87,232,.28);
+  box-shadow: 0 8px 18px rgba(97, 87, 232, 0.28);
 }
-.player-button:active { transform: scale(.9); }
+.player-button:active {
+  transform: scale(0.9);
+}
 .player-button svg {
   width: 24px;
   height: 24px;
@@ -147,7 +172,13 @@ defineExpose({ seek })
   appearance: none;
   border-radius: 999px;
   outline: 0;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--app-primary) 88%, transparent) 0%, color-mix(in srgb, var(--app-primary) 88%, transparent) var(--progress, 0%), color-mix(in srgb, var(--app-ink) 16%, transparent) var(--progress, 0%), color-mix(in srgb, var(--app-ink) 16%, transparent) 100%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--app-primary) 88%, transparent) 0%,
+    color-mix(in srgb, var(--app-primary) 88%, transparent) var(--progress, 0%),
+    color-mix(in srgb, var(--app-ink) 16%, transparent) var(--progress, 0%),
+    color-mix(in srgb, var(--app-ink) 16%, transparent) 100%
+  );
   cursor: pointer;
 }
 .seek-range::-webkit-slider-thumb {
@@ -157,10 +188,15 @@ defineExpose({ seek })
   border: 3px solid color-mix(in srgb, var(--app-primary) 38%, transparent);
   border-radius: 50%;
   background: var(--app-primary);
-  box-shadow: 0 2px 8px rgba(97, 87, 232, .35);
-  transition: transform .2s ease, box-shadow .2s ease;
+  box-shadow: 0 2px 8px rgba(97, 87, 232, 0.35);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
-.seek-range:active::-webkit-slider-thumb { transform: scale(1.3); box-shadow: 0 0 0 5px color-mix(in srgb, var(--app-primary) 18%, transparent); }
+.seek-range:active::-webkit-slider-thumb {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--app-primary) 18%, transparent);
+}
 .seek-range::-moz-range-thumb {
   width: 10px;
   height: 10px;

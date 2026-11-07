@@ -33,12 +33,12 @@ const label = computed(() => speakerLabel(props.speakerId, props.names ?? {}))
   font-size: 13px;
   font-weight: 600;
 }
-:root[data-theme="dark"] .speaker-chip {
+:root[data-theme='dark'] .speaker-chip {
   color: color-mix(in srgb, var(--chip-color) 72%, #fff);
   border-color: color-mix(in srgb, var(--chip-color) 72%, #fff);
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
 }
-:root[data-theme="dark"] .dot {
+:root[data-theme='dark'] .dot {
   background: color-mix(in srgb, var(--chip-color) 72%, #fff);
 }
 .dot {

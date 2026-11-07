@@ -46,75 +46,75 @@ const models = ref<ModelInfo[]>([])
 const modelsError = ref<string | null>(null)
 
 watch(
-    [
-      theme,
-      numSpeakers,
-      enableLlmProtocol,
-      enableLlmCorrection,
-      numThreads,
-      clusterThreshold,
-      vadThreshold,
-    ],
-    () => {
-      const data: Persisted = {
-        theme: theme.value,
-        numSpeakers: numSpeakers.value,
-        enableLlmProtocol: enableLlmProtocol.value,
-        enableLlmCorrection: enableLlmCorrection.value,
-        numThreads: numThreads.value,
-        clusterThreshold: clusterThreshold.value,
-        vadThreshold: vadThreshold.value,
-      }
-      try {
-        localStorage.setItem(KEY, JSON.stringify(data))
-      } catch {
-        /* приватный режим браузера — настройки живут до перезагрузки */
-      }
-    },
-)
-
-function pipelineOptions(): PipelineOptions {
-    return {
+  [
+    theme,
+    numSpeakers,
+    enableLlmProtocol,
+    enableLlmCorrection,
+    numThreads,
+    clusterThreshold,
+    vadThreshold,
+  ],
+  () => {
+    const data: Persisted = {
+      theme: theme.value,
       numSpeakers: numSpeakers.value,
       enableLlmProtocol: enableLlmProtocol.value,
       enableLlmCorrection: enableLlmCorrection.value,
       numThreads: numThreads.value,
       clusterThreshold: clusterThreshold.value,
       vadThreshold: vadThreshold.value,
-}
+    }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data))
+    } catch {
+      /* приватный режим браузера — настройки живут до перезагрузки */
+    }
+  },
+)
+
+function pipelineOptions(): PipelineOptions {
+  return {
+    numSpeakers: numSpeakers.value,
+    enableLlmProtocol: enableLlmProtocol.value,
+    enableLlmCorrection: enableLlmCorrection.value,
+    numThreads: numThreads.value,
+    clusterThreshold: clusterThreshold.value,
+    vadThreshold: vadThreshold.value,
   }
+}
 
 function resetDefaults() {
-    theme.value = DEFAULTS.theme
-    numSpeakers.value = DEFAULTS.numSpeakers
-    enableLlmProtocol.value = DEFAULTS.enableLlmProtocol
-    enableLlmCorrection.value = DEFAULTS.enableLlmCorrection
-    numThreads.value = DEFAULTS.numThreads
-    clusterThreshold.value = DEFAULTS.clusterThreshold
-    vadThreshold.value = DEFAULTS.vadThreshold
+  theme.value = DEFAULTS.theme
+  numSpeakers.value = DEFAULTS.numSpeakers
+  enableLlmProtocol.value = DEFAULTS.enableLlmProtocol
+  enableLlmCorrection.value = DEFAULTS.enableLlmCorrection
+  numThreads.value = DEFAULTS.numThreads
+  clusterThreshold.value = DEFAULTS.clusterThreshold
+  vadThreshold.value = DEFAULTS.vadThreshold
 }
 
 async function loadModels() {
-    modelsError.value = null
-    try {
-      models.value = (await (await getSteno()).getModelsInfo()).items
-    } catch (e) {
-      modelsError.value = errorMessage(e)
-}
+  modelsError.value = null
+  try {
+    models.value = (await (await getSteno()).getModelsInfo()).items
+  } catch (e) {
+    modelsError.value = errorMessage(e)
   }
+}
 
-  /** Ручки мока доступны только в dev-режиме браузера. */
+/** Ручки мока доступны только в dev-режиме браузера. */
 const isMock = import.meta.env.DEV
 async function mockControls(): Promise<StenoMockControls | null> {
-    if (!import.meta.env.DEV) return null
-    const p = (await getSteno()) as unknown as Partial<StenoMockControls>
-    return typeof p.devFailNext === 'function' ? (p as StenoMockControls) : null
+  if (!import.meta.env.DEV) return null
+  const p = (await getSteno()) as unknown as Partial<StenoMockControls>
+  return typeof p.devFailNext === 'function' ? (p as StenoMockControls) : null
 }
 async function devFailNext(code: StenoErrorCode | null) {
-    ;(await mockControls())?.devFailNext(code)
+  ;(await mockControls())?.devFailNext(code)
 }
 async function devSetSpeed(x: number) {
-    ;(await mockControls())?.devSetSpeed(x)
+  ;(await mockControls())?.devSetSpeed(x)
 }
 export function useSettingsStore() {
   return {

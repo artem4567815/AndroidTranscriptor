@@ -30,26 +30,29 @@ async function importFile() {
   if (rec) void router.push(`/processing/${rec.id}`)
 }
 
-function confirmDelete(r: Recording) { pendingDelete.value = r }
+function confirmDelete(r: Recording) {
+  pendingDelete.value = r
+}
 async function removePending() {
   if (pendingDelete.value) await store.remove(pendingDelete.value.id)
   pendingDelete.value = null
 }
-
 </script>
 
 <template>
   <div class="page">
     <header class="topbar">
-        <div class="topline">
-          <div>
-            <p class="eyebrow">Локальная студия</p>
-            <h1>{{ ru.library.title }}</h1>
-          </div>
-          <div class="header-actions">
-            <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings">⚙</RouterLink>
-          </div>
+      <div class="topline">
+        <div>
+          <p class="eyebrow">Локальная студия</p>
+          <h1>{{ ru.library.title }}</h1>
         </div>
+        <div class="header-actions">
+          <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings"
+            >⚙</RouterLink
+          >
+        </div>
+      </div>
     </header>
     <main class="screen">
       <div class="page-content center-block safe-bottom">
@@ -70,27 +73,55 @@ async function removePending() {
           <p class="muted">{{ ru.library.empty }}</p>
         </div>
         <div class="recordings-list">
-          <article v-for="(r, index) in items" :key="r.id" class="record surface fade-up" :style="{ '--delay': `${index * 50}ms` }" @click="open(r)">
+          <article
+            v-for="(r, index) in items"
+            :key="r.id"
+            class="record surface fade-up"
+            :style="{ '--delay': `${index * 50}ms` }"
+            @click="open(r)"
+          >
             <div class="record-icon" :class="`record-icon-${r.status.toLowerCase()}`">
               {{ r.status === 'DONE' ? '◉' : '↥' }}
             </div>
             <div class="record-label">
               <h2>{{ r.title }}</h2>
-              <p class="mono">{{ formatMs(r.durationMs) }} · {{ new Date(r.createdAt).toLocaleDateString('ru-RU') }}</p>
+              <p class="mono">
+                {{ formatMs(r.durationMs) }} ·
+                {{ new Date(r.createdAt).toLocaleDateString('ru-RU') }}
+              </p>
             </div>
-            <span class="badge" :class="`badge-${statusColor[r.status]}`">{{ ru.status[r.status] }}</span>
-            <button class="delete-button" :aria-label="ru.common.delete" @click.stop="confirmDelete(r)">×</button>
+            <span class="badge" :class="`badge-${statusColor[r.status]}`">{{
+              ru.status[r.status]
+            }}</span>
+            <button
+              class="delete-button"
+              :aria-label="ru.common.delete"
+              @click.stop="confirmDelete(r)"
+            >
+              ×
+            </button>
           </article>
         </div>
       </div>
     </main>
     <footer class="bottom-actions">
-        <div class="actions">
-          <button class="action secondary-action" @click="importFile">↥ <span>{{ ru.library.import }}</span></button>
-          <RouterLink class="action primary-action" to="/record">● <span>{{ ru.library.record }}</span></RouterLink>
-        </div>
+      <div class="actions">
+        <button class="action secondary-action" @click="importFile">
+          ↥ <span>{{ ru.library.import }}</span>
+        </button>
+        <RouterLink class="action primary-action" to="/record"
+          >● <span>{{ ru.library.record }}</span></RouterLink
+        >
+      </div>
     </footer>
-    <ConfirmDialog v-if="pendingDelete" :open="Boolean(pendingDelete)" title="Удалить запись?" :message="`${pendingDelete.title}. ${ru.library.deleteConfirm}`" @cancel="pendingDelete = null" @confirm="removePending" />
+    <ConfirmDialog
+      v-if="pendingDelete"
+      :open="Boolean(pendingDelete)"
+      title="Удалить запись?"
+      :message="`${pendingDelete.title}. ${ru.library.deleteConfirm}`"
+      @cancel="pendingDelete = null"
+      @confirm="removePending"
+    />
   </div>
 </template>
 
@@ -144,17 +175,19 @@ async function removePending() {
   overflow: hidden;
   border-radius: var(--app-radius-lg);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(231, 225, 255, 0.76)),
-    var(--app-lilac);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(231, 225, 255, 0.76)), var(--app-lilac);
   box-shadow: var(--app-shadow);
 }
-:root[data-theme="dark"] .welcome-card {
+:root[data-theme='dark'] .welcome-card {
   background:
-    linear-gradient(135deg, rgba(47, 45, 80, .96), rgba(56, 38, 57, .92)),
-    var(--app-lilac);
+    linear-gradient(135deg, rgba(47, 45, 80, 0.96), rgba(56, 38, 57, 0.92)), var(--app-lilac);
 }
-:root[data-theme="dark"] .welcome-copy h1 { color: #fff; }
-:root[data-theme="dark"] .welcome-copy p:last-child { color: #d3d0e6; }
+:root[data-theme='dark'] .welcome-copy h1 {
+  color: #fff;
+}
+:root[data-theme='dark'] .welcome-copy p:last-child {
+  color: #d3d0e6;
+}
 .welcome-copy {
   position: relative;
   z-index: 1;
@@ -225,7 +258,9 @@ async function removePending() {
   box-shadow: 0 10px 24px rgba(74, 64, 146, 0.07);
   animation-delay: var(--delay);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .record:active {
   transform: scale(0.985);

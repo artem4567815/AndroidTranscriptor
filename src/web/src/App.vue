@@ -18,7 +18,7 @@ watch(() => settings.theme.value, applyTheme)
 <template>
   <div class="app-shell">
     <RouterView v-slot="{ Component, route }">
-      <Transition :name="route.meta.transition as string || 'slide-forward'" mode="out-in">
+      <Transition :name="(route.meta.transition as string) || 'slide-forward'" mode="out-in">
         <component :is="Component" :key="route.fullPath" />
       </Transition>
     </RouterView>
