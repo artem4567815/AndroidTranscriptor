@@ -108,3 +108,27 @@ describe('отмена', () => {
     expect(p.failure.value?.code).toBe('CANCELLED')
   })
 })
+
+describe('настройки: в Kotlin уходит только то, что пользователь поменял', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setStenoForTests(createStenoMock())
+  })
+  afterEach(() => setStenoForTests(null))
+
+  it('по умолчанию параметры обработки не отправляются, значения берутся из Kotlin', async () => {
+    const { useSettingsStore } = await import('./settings')
+    const st = useSettingsStore()
+    st.resetDefaults()
+    await st.loadDefaults()
+    const opts = st.pipelineOptions()
+    expect(opts.clusterThreshold).toBeUndefined()
+    expect(opts.vadThreshold).toBeUndefined()
+    expect(st.tunableValue('clusterThreshold')).toBe(0.5) // показ — из getPipelineDefaults
+    st.setTunable('clusterThreshold', 0.35)
+    expect(st.pipelineOptions().clusterThreshold).toBe(0.35)
+    expect(st.isChanged('clusterThreshold')).toBe(true)
+    st.resetTunable('clusterThreshold')
+    expect(st.pipelineOptions().clusterThreshold).toBeUndefined()
+  })
+})

@@ -19,6 +19,9 @@ pip install -r requirements.txt
 `src/eval/data/` (в `.gitignore`): `<имя>.wav` — запись, `<имя>.ref.json` — эталон в формате организаторов.
 m4a/mp3 лучше сначала перевести: `ffmpeg -i in.m4a -ac 1 -ar 16000 data/<имя>.wav`.
 
+Быстрая проверка ASR без своих записей (только macOS): `python make_tts_dialog.py data/` создаёт русский
+диалог 3 «спикеров» с эталоном. Для подбора порогов диаризации он не годится — голос синтетический и один.
+
 ## Команды
 
 ```bash
@@ -32,6 +35,9 @@ python eval_wer.py --data data --out out --keep-punct            # WER с пун
 python eval_der.py --data data --out out --collar-ms 250         # DER
 python eval_timestamps.py --data data --out out                  # ошибка границ реплик
 python report.py --data data --out out > ../../docs/report.md    # сводная таблица для docs/TESTS.md
+python run_pipeline.py data/*.wav --set mergeGapMs=400 --set minSpeakerSilhouette=0.15 -o out  # любой параметр
+python tune.py --param minSpeakerSilhouette=0.05,0.1,0.15 --param embeddingPaddingMs=100,200   # перебор + DER
+python tune.py --param regroupSpeakers=true,false --full                                       # + WER
 ```
 
 RTF телефона: debug-сборка пишет `Android/data/hackuna.matata/files/exports/<id>.timings.json`;

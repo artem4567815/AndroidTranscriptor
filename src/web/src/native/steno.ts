@@ -57,6 +57,31 @@ export interface PipelineOptions {
   numThreads?: number
   clusterThreshold?: number
   vadThreshold?: number
+  /** Расширенные параметры диаризации (экран настроек → «Расширенные»). Не задано — значение из Kotlin. */
+  regroupSpeakers?: boolean
+  minSpeakerSilhouette?: number
+  embeddingPaddingMs?: number
+  mergeGapMs?: number
+  diarizationWindowShift?: number
+}
+
+/** Значения PipelineConfig по умолчанию из Kotlin — единственный источник правды. */
+export interface PipelineDefaults {
+  numSpeakers: number
+  clusterThreshold: number
+  mergeGapMs: number
+  maxSegmentMs: number
+  segmentPaddingMs: number
+  minUtteranceMs: number
+  numThreads: number
+  enableDenoise: boolean
+  enableLlmProtocol: boolean
+  enableLlmCorrection: boolean
+  vadThreshold: number
+  diarizationWindowShift: number
+  regroupSpeakers: boolean
+  embeddingPaddingMs: number
+  minSpeakerSilhouette: number
 }
 export interface TranscriptResult {
   recordingId: string
@@ -104,6 +129,8 @@ export interface StenoPlugin {
   /** Первый запуск: копирование моделей из assets в filesDir. */
   prepareModels(): Promise<{ ready: boolean }>
   getModelsInfo(): Promise<{ items: ModelInfo[] }>
+  /** Значения параметров обработки по умолчанию (PipelineConfig в Kotlin). */
+  getPipelineDefaults(): Promise<PipelineDefaults>
   listRecordings(): Promise<{ items: Recording[] }>
   /** Системный выбор файла. Отмена пользователем — reject с кодом CANCELLED. */
   importAudio(): Promise<Recording>

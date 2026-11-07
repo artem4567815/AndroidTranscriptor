@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useSettingsStore } from '@/stores/settings'
+import { TUNABLES, useSettingsStore, type TunableKey } from '@/stores/settings'
 import type { StenoErrorCode } from '@/native'
 import { ru } from '@/i18n/ru'
 import { formatBytes } from '@/utils/time'
@@ -9,7 +9,28 @@ const settings = useSettingsStore()
 const failCode = ref<StenoErrorCode | 'none'>('none')
 const speed = ref(1)
 const failCodes = Object.keys(ru.errors) as StenoErrorCode[]
-onMounted(() => void settings.loadModels())
+onMounted(() => {
+  void settings.loadModels()
+  void settings.loadDefaults()
+})
+
+type Tunable = (typeof TUNABLES)[number]
+const BASIC: readonly TunableKey[] = ['numThreads', 'clusterThreshold', 'vadThreshold']
+const basic = TUNABLES.filter((t) => BASIC.includes(t.key))
+const advanced = TUNABLES.filter((t) => !BASIC.includes(t.key))
+
+function display(t: Tunable): string {
+  const v = settings.tunableValue(t.key)
+  if (v === undefined) return '…'
+  if (typeof v === 'boolean') return v ? 'вкл' : 'выкл'
+  return t.kind === 'float' ? v.toFixed(2) : String(v)
+}
+function onRange(t: Tunable, e: Event) {
+  settings.setTunable(t.key, Number((e.target as HTMLInputElement).value))
+}
+function onToggle(t: Tunable, e: Event) {
+  settings.setTunable(t.key, (e.target as HTMLInputElement).checked)
+}
 function onFailCode(code: StenoErrorCode | 'none') {
   failCode.value = code
   void settings.devFailNext(code === 'none' ? null : code)
@@ -59,32 +80,56 @@ function setSpeed(value: number) {
           </button>
         </div>
       </section>
-      <section class="settings-card surface">
-        <h2>Обработка</h2>
-        <label class="setting-row"
+      <section
+        v-for="group in [
+          { title: 'Обработка', hint: '', items: basic },
+          { title: ru.settings.advanced, hint: ru.settings.advancedHint, items: advanced },
+        ]"
+        :key="group.title"
+        class="settings-card surface"
+      >
+        <h2>{{ group.title }}</h2>
+        <p v-if="group.hint" class="muted tunable-hint">{{ group.hint }}</p>
+        <p v-if="settings.defaultsError.value" class="inline-error">
+          {{ settings.defaultsError.value }}
+        </p>
+        <label v-for="t in group.items" :key="t.key" class="setting-row tunable-row"
           ><span
-            ><b>{{ ru.settings.threads }}</b
-            ><small>Параллельные вычисления</small></span
+            ><b
+              >{{ ru.settings.tunables[t.key][0]
+              }}<i v-if="settings.isChanged(t.key)" class="changed-dot" aria-label="изменено" /></b
+            ><small
+              >{{ ru.settings.tunables[t.key][1] }} · <b class="tunable-value">{{ display(t) }}</b>
+              <template v-if="settings.isChanged(t.key)">
+                ({{ ru.settings.byDefault }}: {{ settings.pipelineDefaults.value?.[t.key] }})
+                <button
+                  class="link-button"
+                  type="button"
+                  @click.prevent="settings.resetTunable(t.key)"
+                >
+                  {{ ru.settings.resetOne }}
+                </button>
+              </template></small
+            ></span
+          ><template v-if="t.kind === 'bool'"
+            ><input
+              class="toggle-input"
+              type="checkbox"
+              :checked="Boolean(settings.tunableValue(t.key))"
+              @change="onToggle(t, $event)" /><i class="toggle" aria-hidden="true" /></template
           ><input
-            v-model.number="settings.numThreads.value"
+            v-else
             class="range-control"
             type="range"
-            min="1"
-            max="8"
+            :min="t.min"
+            :max="t.max"
+            :step="t.step"
+            :value="Number(settings.tunableValue(t.key) ?? t.min)"
+            @input="onRange(t, $event)"
         /></label>
-        <label class="setting-row"
-          ><span
-            ><b>{{ ru.settings.clusterThreshold }}</b
-            ><small>{{ settings.clusterThreshold.value.toFixed(2) }}</small></span
-          ><input
-            v-model.number="settings.clusterThreshold.value"
-            class="range-control"
-            type="range"
-            min=".1"
-            max="1"
-            step=".05"
-        /></label>
-        <button class="text-button" @click="settings.resetDefaults">Сбросить настройки</button>
+        <button v-if="group.items === advanced" class="text-button" @click="settings.resetDefaults">
+          Сбросить настройки
+        </button>
       </section>
       <section class="settings-card surface">
         <h2>{{ ru.settings.models }}</h2>
@@ -284,5 +329,66 @@ function setSpeed(value: number) {
   color: #fff;
   border-color: var(--app-primary);
   background: var(--app-primary);
+}
+.tunable-hint {
+  margin: -4px 0 8px;
+  font-size: 13px;
+}
+.tunable-row {
+  position: relative;
+}
+.tunable-value {
+  color: var(--app-text, inherit);
+}
+.changed-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--app-primary);
+  vertical-align: middle;
+}
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--app-primary);
+  font: inherit;
+  text-decoration: underline;
+}
+.toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.toggle {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 27px;
+  border-radius: 999px;
+  background: var(--app-border);
+  transition: background 0.2s ease;
+}
+.toggle::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(20, 18, 45, 0.18);
+  content: '';
+  transition: transform 0.2s ease;
+}
+.toggle-input:checked + .toggle {
+  background: var(--app-primary);
+}
+.toggle-input:checked + .toggle::after {
+  transform: translateX(19px);
 }
 </style>

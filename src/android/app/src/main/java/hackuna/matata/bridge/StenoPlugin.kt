@@ -109,6 +109,10 @@ class StenoPlugin : Plugin(), KoinComponent {
     @PluginMethod
     fun getModelsInfo(call: PluginCall) = io(call) { call.resolve(JsMapping.models(models.status())) }
 
+    /** Значения параметров обработки по умолчанию (PipelineConfig) — Vue показывает их в настройках. */
+    @PluginMethod
+    fun getPipelineDefaults(call: PluginCall) = io(call) { call.resolve(JsMapping.pipelineDefaults()) }
+
     // ---- Записи ----
 
     @PluginMethod
