@@ -144,10 +144,28 @@ class SegmentPlannerTest {
     }
 
     @Test
-    fun `короткая смена спикера внутри участка не режет его`() {
+    fun `короткий ответ другого спикера сохраняет отдельный участок`() {
         val units = SegmentPlanner.speechUnits(
             listOf(SpeechRegion(0, 1800)),
             listOf(SpeakerSegment(0, 0, 1200), SpeakerSegment(1, 1300, 1800)),
+        )
+        assertEquals(listOf(0L to 1250L, 1250L to 1800L), units.map { it.startMs to it.endMs })
+    }
+
+    @Test
+    fun `короткое вмешательство внутри монолога сохраняет обе смены голоса`() {
+        val units = SegmentPlanner.speechUnits(
+            listOf(SpeechRegion(0, 2800)),
+            listOf(SpeakerSegment(0, 0, 1200), SpeakerSegment(1, 1200, 1600), SpeakerSegment(0, 1600, 2800)),
+        )
+        assertEquals(listOf(0L to 1200L, 1200L to 1600L, 1600L to 2800L), units.map { it.startMs to it.endMs })
+    }
+
+    @Test
+    fun `мимолетный скачок метки не разрезает речь`() {
+        val units = SegmentPlanner.speechUnits(
+            listOf(SpeechRegion(0, 1800)),
+            listOf(SpeakerSegment(0, 0, 1600), SpeakerSegment(1, 1600, 1800)),
         )
         assertEquals(listOf(0L to 1800L), units.map { it.startMs to it.endMs })
     }

@@ -224,7 +224,7 @@ def find_pairs(data_dir: Path, hyp_dir: Path) -> list[tuple[str, Path, Path]]:
 
 # ---- Второй проход диаризации — порт SegmentPlanner.speechUnits/labelUnits и SpeakerClustering ----
 
-UNIT_MAX_MS, UNIT_WINDOW_MS, MIN_TURN_MS = 3000, 1500, 1000
+UNIT_MAX_MS, UNIT_WINDOW_MS, MIN_TURN_MS = 3000, 1500, 300
 SAME_SPEAKER_SIMILARITY = 0.80
 
 

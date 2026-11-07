@@ -140,7 +140,7 @@ object SegmentPlanner {
     const val UNIT_WINDOW_MS = 1500L
 
     /** Смена спикера внутри участка речи учитывается, только если обе части не короче этого. */
-    const val MIN_TURN_MS = 1000L
+    const val MIN_TURN_MS = 300L
 
     /**
      * Участки речи для второго прохода диаризации и ASR:
