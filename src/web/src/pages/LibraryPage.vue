@@ -65,6 +65,12 @@ async function removePending() {
           <div class="wave-art" aria-hidden="true">
             <i v-for="n in 9" :key="n" :style="{ '--i': n }" />
           </div>
+          <div class="brand-avatar" aria-label="Нейро-стенографист">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <circle cx="24" cy="24" r="8" />
+              <path d="M24 7v5M24 36v5M7 24h5M36 24h5M12 12l4 4M32 32l4 4M36 12l-4 4M16 32l-4 4" />
+            </svg>
+          </div>
         </section>
         <p v-if="error" class="error surface">{{ error }}</p>
         <div v-if="!loading && items.length === 0" class="empty surface fade-up">
@@ -72,7 +78,7 @@ async function removePending() {
           <h2>Начнём с первой записи</h2>
           <p class="muted">{{ ru.library.empty }}</p>
         </div>
-        <div class="recordings-list">
+        <div class="recordings-list" aria-label="Записи, листайте по горизонтали">
           <article
             v-for="(r, index) in items"
             :key="r.id"
@@ -81,7 +87,10 @@ async function removePending() {
             @click="open(r)"
           >
             <div class="record-icon" :class="`record-icon-${r.status.toLowerCase()}`">
-              {{ r.status === 'DONE' ? '◉' : '↥' }}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
+                <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8" />
+              </svg>
             </div>
             <div class="record-label">
               <h2>{{ r.title }}</h2>
@@ -221,6 +230,28 @@ async function removePending() {
   height: 106px;
   transform: rotate(-12deg);
 }
+.brand-avatar {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 17px;
+  color: #fff;
+  background: linear-gradient(145deg, #7d73f6, #6157e8);
+  box-shadow: 0 10px 24px rgba(97, 87, 232, 0.26);
+}
+.brand-avatar svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 2;
+}
 .wave-art i {
   display: block;
   width: 7px;
@@ -241,11 +272,21 @@ async function removePending() {
   box-shadow: 0 0 0 5px rgba(33, 181, 115, 0.14);
 }
 .recordings-list {
-  display: grid;
+  display: flex;
   gap: 10px;
   margin-top: 20px;
+  padding: 2px 2px 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.recordings-list::-webkit-scrollbar {
+  display: none;
 }
 .record {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr) auto 30px;
   align-items: center;
@@ -294,6 +335,15 @@ async function removePending() {
 }
 .record-icon {
   margin-right: 0;
+}
+.record-icon svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .record-label {
   min-width: 0;

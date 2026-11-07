@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProcessingStore } from '@/stores/processing'
 import { useRecordingsStore } from '@/stores/recordings'
@@ -16,6 +16,13 @@ const settings = useSettingsStore()
 const recording = () => recordings.byId(props.id)
 const speakerOptions = [0, 2, 3, 4, 5, 6]
 const speakerOpen = ref(false)
+const estimatedRemaining = computed(() => {
+  if (!processing.running.value || processing.elapsedMs.value < 1000) return null
+  const progress =
+    STAGES.reduce((sum, stage) => sum + processing.stages[stage].fraction, 0) / STAGES.length
+  if (progress < 0.05 || progress >= 1) return null
+  return Math.max(1000, processing.elapsedMs.value * ((1 - progress) / progress))
+})
 onMounted(async () => {
   await processing.ensureListeners()
   if (!recordings.items.value.length) await recordings.refresh()
@@ -98,6 +105,9 @@ function selectSpeaker(count: number) {
         <div class="stage-heading">
           <span>Обработка записи</span><strong>{{ formatMs(processing.elapsedMs.value) }}</strong>
         </div>
+        <p v-if="estimatedRemaining" class="estimate">
+          Осталось примерно {{ formatMs(estimatedRemaining) }}
+        </p>
         <div v-for="stage in STAGES" :key="stage" class="stage-row">
           <span
             class="stage-dot"
@@ -263,6 +273,11 @@ function selectSpeaker(count: number) {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+.estimate {
+  margin: 2px 12px 8px;
+  color: var(--app-muted);
+  font-size: 12px;
 }
 .stage-heading strong {
   color: var(--app-ink);

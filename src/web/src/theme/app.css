@@ -114,9 +114,10 @@ a {
   width: min(100% - 32px, 680px);
   min-height: 78px;
   margin: 0 auto;
+  padding-top: max(10px, env(safe-area-inset-top));
 }
 .topbar.compact {
-  min-height: 64px;
+  min-height: 74px;
 }
 .topbar-title {
   max-width: 70%;

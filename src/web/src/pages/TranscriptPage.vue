@@ -7,6 +7,7 @@ import UtteranceCard from '@/components/UtteranceCard.vue'
 import { playableSrc, type ExportFormat } from '@/native'
 import { ru } from '@/i18n/ru'
 import ToastMessage from '@/components/ToastMessage.vue'
+import DownloadDialog from '@/components/DownloadDialog.vue'
 
 const props = defineProps<{ id: string }>()
 const store = useTranscriptStore()
@@ -16,11 +17,18 @@ const audioSrc = computed(() => (recording.value ? playableSrc(recording.value.a
 const tab = ref<'transcript' | 'protocol'>('transcript')
 const seekToMs = ref<number | null>(null)
 const toastOpen = ref(false)
+const downloadOpen = ref(false)
+const isPlaying = ref(false)
 onMounted(async () => {
   if (!recordings.items.value.length) await recordings.refresh()
   await store.load(props.id)
 })
-watch(store.activeIndex, () => undefined)
+watch([store.activeIndex, isPlaying], ([index, playing]) => {
+  if (!playing || index < 0) return
+  document
+    .querySelector<HTMLElement>(`[data-utterance-index="${index}"]`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+})
 function seek(ms: number) {
   seekToMs.value = ms + Math.random() * 0.001
 }
@@ -34,6 +42,18 @@ async function exportAs(format: ExportFormat) {
     window.setTimeout(() => (toastOpen.value = false), 2200)
   }
 }
+function downloadAudio() {
+  if (!audioSrc.value) return
+  const link = document.createElement('a')
+  link.href = audioSrc.value
+  link.download = recording.value?.title ?? 'recording'
+  link.click()
+  downloadOpen.value = false
+}
+function downloadJson() {
+  downloadOpen.value = false
+  void exportAs('json')
+}
 </script>
 
 <template>
@@ -41,7 +61,7 @@ async function exportAs(format: ExportFormat) {
     <header class="topbar compact">
       <RouterLink class="back-button" to="/library">‹</RouterLink
       ><span class="topbar-title">{{ recording?.title ?? ru.transcript.title }}</span
-      ><button class="icon-button" @click="exportAs('json')">⇩</button>
+      ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
       <div class="tabs">
@@ -88,10 +108,19 @@ async function exportAs(format: ExportFormat) {
         :title="recording.title"
         :duration-ms="recording.durationMs"
         :seek-to-ms="seekToMs"
+        :markers="store.utterances.value.map((utterance) => utterance.start_ms)"
         @position="store.positionMs.value = $event"
+        @playing="isPlaying = $event"
       />
     </footer>
     <ToastMessage :open="toastOpen" :message="ru.transcript.exported" />
+    <DownloadDialog
+      :open="downloadOpen"
+      title="Скачать запись"
+      @audio="downloadAudio"
+      @json="downloadJson"
+      @cancel="downloadOpen = false"
+    />
   </div>
 </template>
 
