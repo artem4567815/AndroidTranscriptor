@@ -11,6 +11,7 @@ const router = useRouter()
 const now = ref(Date.now())
 const ticker = setInterval(() => (now.value = Date.now()), 200)
 const elapsed = computed(() => (recordStartedAt.value ? now.value - recordStartedAt.value : 0))
+const displayLevel = computed(() => Math.min(1, level.value * 1.7))
 const pressed = ref(false)
 
 async function toggle() {
@@ -61,7 +62,7 @@ onBeforeUnmount(() => {
       </button>
       <div class="timer mono">{{ formatMs(elapsed) }}</div>
       <div class="meter">
-        <div class="meter-fill" :style="{ width: `${Math.round(level * 100)}%` }" />
+        <div class="meter-fill" :style="{ width: `${Math.round(displayLevel * 100)}%` }" />
       </div>
       <button class="record-button" :class="{ 'is-recording': isRecording }" @click="toggle">
         <span class="record-button-icon">{{ isRecording ? '■' : '●' }}</span
@@ -197,7 +198,7 @@ onBeforeUnmount(() => {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #8177f5, #ed725d, #17a86b);
-  transition: width 0.1s linear;
+  transition: width 0.16s ease-out;
 }
 .record-button {
   display: flex;
