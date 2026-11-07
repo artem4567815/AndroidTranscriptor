@@ -26,7 +26,7 @@ data class SpeakerSegment(val speaker: Int, val startMs: Long, val endMs: Long)
 
 data class TimedToken(val text: String, val startMs: Long)
 
-/** Результат ASR для одного сегмента. Время — абсолютное, от начала записи. */
+/** Результат ASR для одного сегмента. Все метки отсчитываются от начала переданного ASR аудио. */
 data class RecognizedSegment(
     val startMs: Long,
     val endMs: Long,
