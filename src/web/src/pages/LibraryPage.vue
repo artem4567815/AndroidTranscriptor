@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { onMounted, ref } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
 import { useRecordingsStore } from '@/stores/recordings'
 import type { Recording, RecordingStatus } from '@/native'
 import { ru } from '@/i18n/ru'
@@ -10,7 +11,9 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const store = useRecordingsStore()
 const { items, error, loading } = store
 const router = useRouter()
+const settings = useSettingsStore()
 const pendingDelete = ref<Recording | null>(null)
+const deletingIds = ref(new Set<string>())
 
 const statusColor: Record<RecordingStatus, string> = {
   NEW: 'medium',
@@ -34,8 +37,18 @@ function confirmDelete(r: Recording) {
   pendingDelete.value = r
 }
 async function removePending() {
-  if (pendingDelete.value) await store.remove(pendingDelete.value.id)
+  if (pendingDelete.value) {
+    const id = pendingDelete.value.id
+    deletingIds.value = new Set(deletingIds.value).add(id)
+    await new Promise((resolve) => window.setTimeout(resolve, 220))
+    await store.remove(id)
+    deletingIds.value = new Set([...deletingIds.value].filter((value) => value !== id))
+  }
   pendingDelete.value = null
+}
+
+function toggleTheme() {
+  settings.theme.value = settings.theme.value === 'dark' ? 'light' : 'dark'
 }
 </script>
 
@@ -65,12 +78,26 @@ async function removePending() {
           <div class="wave-art" aria-hidden="true">
             <i v-for="n in 9" :key="n" :style="{ '--i': n }" />
           </div>
-          <div class="brand-avatar" aria-label="Нейро-стенографист">
-            <svg viewBox="0 0 48 48" aria-hidden="true">
-              <circle cx="24" cy="24" r="8" />
-              <path d="M24 7v5M24 36v5M7 24h5M36 24h5M12 12l4 4M32 32l4 4M36 12l-4 4M16 32l-4 4" />
-            </svg>
-          </div>
+          <button
+            class="brand-avatar theme-toggle"
+            :class="{ 'is-dark': settings.theme.value === 'dark' }"
+            aria-label="Переключить тему"
+            @click="toggleTheme"
+          >
+            <span class="theme-icon theme-sun" aria-hidden="true">
+              <svg viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="8" />
+                <path
+                  d="M24 7v5M24 36v5M7 24h5M36 24h5M12 12l4 4M32 32l4 4M36 12l-4 4M16 32l-4 4"
+                />
+              </svg>
+            </span>
+            <span class="theme-icon theme-moon" aria-hidden="true">
+              <svg viewBox="0 0 48 48">
+                <path d="M31.5 8.5a16.5 16.5 0 1 0 8 30.9A17.5 17.5 0 0 1 31.5 8.5Z" />
+              </svg>
+            </span>
+          </button>
         </section>
         <p v-if="error" class="error surface">{{ error }}</p>
         <div v-if="!loading && items.length === 0" class="empty surface fade-up">
@@ -78,11 +105,17 @@ async function removePending() {
           <h2>Начнём с первой записи</h2>
           <p class="muted">{{ ru.library.empty }}</p>
         </div>
-        <div class="recordings-list" aria-label="Записи, листайте по горизонтали">
+        <TransitionGroup
+          name="record-list"
+          tag="div"
+          class="recordings-list"
+          aria-label="Записи, листайте вертикально"
+        >
           <article
             v-for="(r, index) in items"
             :key="r.id"
             class="record surface fade-up"
+            :class="{ 'is-deleting': deletingIds.has(r.id) }"
             :style="{ '--delay': `${index * 50}ms` }"
             @click="open(r)"
           >
@@ -110,7 +143,7 @@ async function removePending() {
               ×
             </button>
           </article>
-        </div>
+        </TransitionGroup>
       </div>
     </main>
     <footer class="bottom-actions">
@@ -244,6 +277,50 @@ async function removePending() {
   background: linear-gradient(145deg, #7d73f6, #6157e8);
   box-shadow: 0 10px 24px rgba(97, 87, 232, 0.26);
 }
+.theme-toggle {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.25s ease;
+}
+.theme-toggle:active {
+  transform: scale(0.92) rotate(-8deg);
+}
+.theme-toggle.is-dark {
+  box-shadow: 0 10px 24px rgba(45, 37, 116, 0.42);
+}
+.theme-icon {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  inset: 0;
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.theme-icon svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+.theme-moon {
+  opacity: 0;
+  transform: rotate(-35deg) scale(0.45);
+}
+.theme-toggle.is-dark .theme-sun {
+  opacity: 0;
+  transform: rotate(35deg) scale(0.45);
+}
+.theme-toggle.is-dark .theme-moon {
+  opacity: 1;
+  transform: rotate(0) scale(1);
+}
 .brand-avatar svg {
   width: 30px;
   height: 30px;
@@ -273,10 +350,11 @@ async function removePending() {
 }
 .recordings-list {
   display: grid;
+  align-content: start;
   gap: 10px;
   height: clamp(180px, calc(100vh - 420px), 520px);
   margin-top: 20px;
-  padding: 2px 2px 12px;
+  padding: 2px 2px 112px;
   overflow-y: auto;
   scrollbar-width: none;
   overscroll-behavior-y: contain;
@@ -303,6 +381,32 @@ async function removePending() {
 }
 .record:active {
   transform: scale(0.985);
+}
+.record-list-enter-active,
+.record-list-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    max-height 0.22s ease,
+    margin 0.22s ease;
+}
+.record-list-leave-active {
+  overflow: hidden;
+}
+.record-list-enter-from,
+.record-list-leave-to {
+  max-height: 0;
+  margin-top: -5px;
+  margin-bottom: -5px;
+  opacity: 0;
+  transform: translateX(24px) scale(0.96);
+}
+.record-list-move {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.record.is-deleting {
+  opacity: 0.55;
+  transform: translateX(10px) scale(0.98);
 }
 .record h2 {
   margin: 0 0 6px;
