@@ -99,14 +99,15 @@ class DefaultTranscriptionPipelineTest {
         val done = events.last() as PipelineEvent.Completed
         val r = done.result
         assertEquals(listOf("speaker_1", "speaker_2"), r.transcript.transcript.map { it.speakerId })
-        assertEquals("раз два", r.transcript.transcript[0].text) // пауза 300 < 700 — склеено
+        // ASR получает участки VAD целиком: 0–4000 (оба отрезка спикера 7) и 5000–9000.
+        assertEquals(listOf("раз", "два"), r.transcript.transcript.map { it.text })
         assertEquals(0L to 4000L, r.transcript.transcript[0].startMs to r.transcript.transcript[0].endMs)
         assertEquals("протокол", r.protocol)
         assertEquals(mapOf("speaker_1" to "Председатель"), r.speakerNames)
         assertNull(r.llmCorrected)
         assertEquals(setOf(Stage.DECODE, Stage.PREPROCESS, Stage.VAD, Stage.DIARIZATION, Stage.ASR, Stage.MERGE, Stage.LLM), r.timings.keys)
         assertEquals(10_000L, r.audioDurationMs)
-        assertTrue(events.any { it is PipelineEvent.Progress && it.stage == Stage.DIARIZATION && it.fraction == 0.5f })
+        assertTrue(events.any { it is PipelineEvent.Progress && it.stage == Stage.DIARIZATION && it.fraction == 0.4f })
         assertEquals(listOf("vad", "diar", "asr", "llm"), opened)
         assertEquals(listOf("vad", "diar", "asr", "llm"), closed)
     }

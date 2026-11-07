@@ -125,6 +125,9 @@ def resolve_overlaps(segments: list[tuple[int, int, int]]) -> list[tuple[int, in
             start = out[-1][1]  # начало предыдущего могли сдвинуть разрезом
         if end <= start:
             continue
+        if out and spk == out[-1][0] and start <= out[-1][2]:
+            out[-1][2] = max(out[-1][2], end)
+            continue
         if not out or start >= out[-1][2]:
             out.append([spk, start, end])
             continue
@@ -143,13 +146,54 @@ def resolve_overlaps(segments: list[tuple[int, int, int]]) -> list[tuple[int, in
     return [(s, a, b) for s, a, b in out if b > a]
 
 
+def uncovered(speech: list[tuple[int, int]], segs: list[tuple[int, int, int]]) -> list[tuple[int, int]]:
+    """Части участков речи, не покрытые отрезками (speaker, start, end)."""
+    res = []
+    for a, b in sorted(speech):
+        cur = a
+        for _, s, e in segs:
+            if e <= cur or s >= b:
+                continue
+            if s > cur:
+                res.append((cur, s))
+            cur = max(cur, e)
+        if cur < b:
+            res.append((cur, b))
+    return res
+
+
+def cover_speech(segs: list[tuple[int, int, int]], speech: list[tuple[int, int]],
+                 attach_ms: int = 300, min_gap_ms: int = 50) -> list[tuple[int, int, int]]:
+    """Порт SegmentPlanner.coverSpeech: «ничья» речь VAD отдаётся ближайшему спикеру."""
+    if not segs or not speech:
+        return segs
+    out = [list(x) for x in sorted(segs, key=lambda x: x[1])]
+    for ga, gb in [g for g in uncovered(speech, [tuple(x) for x in out]) if g[1] - g[0] >= min_gap_ms]:
+        prev = max((i for i, x in enumerate(out) if x[2] <= ga), default=None)
+        nxt = min((i for i, x in enumerate(out) if x[1] >= gb), default=None)
+        d_prev = ga - out[prev][2] if prev is not None else float("inf")
+        d_next = out[nxt][1] - gb if nxt is not None else float("inf")
+        if d_prev <= d_next:
+            if d_prev <= attach_ms:
+                out[prev][2] = gb
+            else:
+                out.append([out[prev][0], ga, gb])
+        else:
+            if d_next <= attach_ms:
+                out[nxt][1] = ga
+            else:
+                out.append([out[nxt][0], ga, gb])
+        out.sort(key=lambda x: x[1])
+    return [tuple(x) for x in out]
+
+
 def plan_segments(segments: list[tuple[int, int, int]], speech: list[tuple[int, int]], cfg: dict,
                   duration_ms: int) -> list[tuple[int, int, int, int, int]]:
     """(speaker, start, end) → [(speaker, start, end, audio_start, audio_end)]."""
     max_ms, pad, min_ms = cfg["maxSegmentMs"], cfg["segmentPaddingMs"], cfg["minUtteranceMs"]
     cuts = pause_midpoints(speech)
     out = []
-    for spk, start, end in (s for s in resolve_overlaps(segments) if s[2] - s[1] >= min_ms):
+    for spk, start, end in (s for s in cover_speech(resolve_overlaps(segments), speech) if s[2] - s[1] >= min_ms):
         cur = start
         inside = [c for c in cuts if start < c < end]
         while end - cur > max_ms:
@@ -158,7 +202,13 @@ def plan_segments(segments: list[tuple[int, int, int]], speech: list[tuple[int, 
             out.append((spk, cur, cut))
             cur = cut
         out.append((spk, cur, end))
-    return [(s, a, b, max(0, a - pad), min(duration_ms, b + pad)) for s, a, b in out]
+    # Паддинг только в тишину — не заходим в соседний кусок (иначе слово на стыке распознаётся дважды).
+    res = []
+    for i, (s, a, b) in enumerate(out):
+        prev_end = out[i - 1][2] if i > 0 else 0
+        next_start = out[i + 1][1] if i + 1 < len(out) else duration_ms
+        res.append((s, a, b, min(max(a - pad, prev_end, 0), a), max(min(b + pad, next_start, duration_ms), b)))
+    return res
 
 
 def find_pairs(data_dir: Path, hyp_dir: Path) -> list[tuple[str, Path, Path]]:
@@ -170,3 +220,136 @@ def find_pairs(data_dir: Path, hyp_dir: Path) -> list[tuple[str, Path, Path]]:
         if hyp.exists():
             pairs.append((name, ref, hyp))
     return pairs
+
+
+# ---- Второй проход диаризации — порт SegmentPlanner.speechUnits/labelUnits и SpeakerClustering ----
+
+UNIT_MAX_MS, UNIT_WINDOW_MS, MIN_TURN_MS = 3000, 1500, 1000
+SAME_SPEAKER_SIMILARITY = 0.80
+
+
+def speech_units(speech: list[tuple[int, int]], segs: list[tuple[int, int, int]]) -> list[tuple[int, int]]:
+    resolved = resolve_overlaps(segs)
+    base = sorted(speech) if speech else [(a, b) for _, a, b in resolved]
+    out = []
+    for ra, rb in base:
+        inside = [x for x in resolved if x[2] > ra and x[1] < rb]
+        cuts, last = [], ra
+        for p, q in zip(inside, inside[1:]):
+            if p[0] == q[0]:
+                continue
+            cut = min(max((p[2] + q[1]) // 2, ra), rb)
+            if cut - last >= MIN_TURN_MS and rb - cut >= MIN_TURN_MS:
+                cuts.append(cut); last = cut
+        bounds = [ra] + cuts + [rb]
+        for a, b in zip(bounds, bounds[1:]):
+            if b - a <= UNIT_MAX_MS:
+                out.append((a, b)); continue
+            t = a
+            while t < b:
+                e = min(b, t + UNIT_WINDOW_MS)
+                if b - e < UNIT_WINDOW_MS // 2:
+                    e = b
+                out.append((t, e)); t = e
+    return out
+
+
+def label_units(units, labels, segs) -> list[tuple[int, int, int]]:
+    if labels is not None and len(labels) == len(units):
+        return [(int(l), a, b) for l, (a, b) in zip(labels, units)]
+    resolved = resolve_overlaps(segs); out = []
+    for a, b in units:
+        best = max(resolved, key=lambda x: min(b, x[2]) - max(a, x[1]), default=None)
+        if best and min(b, best[2]) - max(a, best[1]) > 0:
+            spk = best[0]
+        elif resolved:
+            spk = min(resolved, key=lambda x: max(x[1] - b, a - x[2]))[0]
+        else:
+            spk = 0
+        out.append((spk, a, b))
+    return out
+
+
+def cluster_speakers(E, num_speakers: int = 0, min_silhouette: float = 0.10, max_speakers: int = 6):
+    """Порт SpeakerClustering.cluster (без ограничения maxUnits — на стенде записи короткие)."""
+    import numpy as np
+    n = len(E)
+    if n == 0:
+        return []
+    E = np.asarray(E, dtype=np.float64); E = E / np.maximum(np.linalg.norm(E, axis=1, keepdims=True), 1e-9)
+    if n == 1:
+        return [0]
+    S = E @ E.T
+    k_cap = min(max(max_speakers, num_speakers), n)
+    parts = _agglomerate(S, k_cap)
+    if num_speakers > 0:
+        k = min(num_speakers, n)
+    elif n < 3:
+        k = 1
+    else:
+        sils = {k: _silhouette(S, parts[k]) for k in range(2, min(max_speakers, n - 1) + 1) if k in parts}
+        k = max(sils, key=sils.get) if sils else 1
+        if not sils or sils[k] < min_silhouette:
+            k = 1
+    lab = list(parts[k])
+    if num_speakers <= 0:
+        while True:
+            groups = sorted(set(lab))
+            if len(groups) < 2:
+                break
+            C = {g: E[[i for i, l in enumerate(lab) if l == g]].sum(0) for g in groups}
+            C = {g: v / np.linalg.norm(v) for g, v in C.items()}
+            best, pair = SAME_SPEAKER_SIMILARITY, None
+            for i in range(len(groups)):
+                for j in range(i + 1, len(groups)):
+                    sim = float(C[groups[i]] @ C[groups[j]])
+                    if sim > best:
+                        best, pair = sim, (groups[i], groups[j])
+            if pair is None:
+                break
+            lab = [pair[0] if l == pair[1] else l for l in lab]
+    ids = {}
+    return [ids.setdefault(l, len(ids)) for l in lab]
+
+
+def _agglomerate(S, max_k):
+    import numpy as np
+    m = len(S); s = S.copy(); size = [1] * m; active = [True] * m; owner = list(range(m)); res = {}
+
+    def snap():
+        ids = {}
+        return [ids.setdefault(o, len(ids)) for o in owner]
+    count = m
+    if count <= max_k:
+        res[count] = snap()
+    while count > 1:
+        best, ba, bb = -np.inf, -1, -1
+        for a in range(m):
+            if not active[a]:
+                continue
+            for b in range(a + 1, m):
+                if active[b] and s[a][b] > best:
+                    best, ba, bb = s[a][b], a, b
+        for c in range(m):
+            if active[c] and c not in (ba, bb):
+                v = (s[ba][c] * size[ba] + s[bb][c] * size[bb]) / (size[ba] + size[bb]); s[ba][c] = s[c][ba] = v
+        size[ba] += size[bb]; active[bb] = False
+        owner = [ba if o == bb else o for o in owner]; count -= 1
+        if count <= max_k:
+            res[count] = snap()
+    return res
+
+
+def _silhouette(S, lab):
+    groups = set(lab)
+    if len(groups) < 2:
+        return -1.0
+    tot = 0.0
+    for i in range(len(lab)):
+        own = [j for j in range(len(lab)) if j != i and lab[j] == lab[i]]
+        if not own:
+            continue
+        a = sum(1 - S[i][j] for j in own) / len(own)
+        b = min(sum(1 - S[i][j] for j in range(len(lab)) if lab[j] == g) / lab.count(g) for g in groups if g != lab[i])
+        tot += (b - a) / max(a, b)
+    return tot / len(lab)

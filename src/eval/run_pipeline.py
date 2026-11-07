@@ -15,8 +15,8 @@ import sys
 import time
 from pathlib import Path
 
-from common import (SpeakerText, load_config, merge_utterances, plan_segments, preprocess, resolve_overlaps,
-                    save_transcript)
+from common import (SpeakerText, cluster_speakers, label_units, load_config, merge_utterances, plan_segments,
+                    preprocess, resolve_overlaps, save_transcript, speech_units)
 
 SR = 16_000
 
@@ -33,6 +33,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--threads", type=int, default=None, help="переопределить numThreads")
     p.add_argument("--window-shift", type=float, default=None,
                    help="переопределить diarizationWindowShift (шаг окна сегментации, доля 10-секундного окна)")
+    p.add_argument("--min-on", type=float, default=0.2, help="диаризация: отрезки короче (с) выбрасываются (как в приложении)")
+    p.add_argument("--min-off", type=float, default=0.5, help="диаризация: паузы одного спикера короче (с) склеиваются")
+    p.add_argument("--set", action="append", default=[], metavar="ПАРАМЕТР=ЗНАЧЕНИЕ",
+                   help="переопределить любой параметр PipelineConfig, можно несколько раз: "
+                        "--set mergeGapMs=400 --set minSpeakerSilhouette=0.15")
+    p.add_argument("--no-regroup", action="store_true", help="без второго прохода диаризации (только sherpa)")
     p.add_argument("--diarization-only", action="store_true",
                    help="только VAD + диаризация (без ASR): <имя>.json с пустым текстом — для eval_der.py "
                         "и подбора порогов диаризации; быстро и не зависит от языка записи")
@@ -75,6 +81,13 @@ def main() -> int:
         cfg["numThreads"] = args.threads
     if args.window_shift is not None:
         cfg["diarizationWindowShift"] = args.window_shift
+    for item in args.set:
+        key, _, raw = item.partition("=")
+        if key not in cfg:
+            print(f"Нет такого параметра: {key}. Есть: {', '.join(cfg)}", file=sys.stderr)
+            return 2
+        old_v = cfg[key]
+        cfg[key] = (raw.lower() in ("1", "true", "yes", "да")) if isinstance(old_v, bool) else type(old_v)(float(raw))
     m = Path(args.models)
     out_dir = Path(args.out)
 
@@ -83,6 +96,10 @@ def main() -> int:
     vad_cfg = sherpa_onnx.VadModelConfig()
     vad_cfg.silero_vad.model = str(m / "vad/silero_vad.onnx")
     vad_cfg.silero_vad.threshold = cfg["vadThreshold"]
+    # Как в SileroVoiceActivityDetector (Kotlin): иначе у sherpa свои значения по умолчанию.
+    vad_cfg.silero_vad.min_silence_duration = 0.25
+    vad_cfg.silero_vad.min_speech_duration = 0.25
+    vad_cfg.silero_vad.max_speech_duration = 30
     vad_cfg.sample_rate = SR
 
     diar_cfg = sherpa_onnx.OfflineSpeakerDiarizationConfig(
@@ -97,6 +114,9 @@ def main() -> int:
         clustering=sherpa_onnx.FastClusteringConfig(
             num_clusters=cfg["numSpeakers"] if cfg["numSpeakers"] > 0 else -1,
             threshold=cfg["clusterThreshold"]),
+        # Как в SherpaDiarizer (Kotlin): иначе у sherpa свои значения по умолчанию и стенд расходится с приложением.
+        min_duration_on=args.min_on,
+        min_duration_off=args.min_off,
     )
 
     for audio_path in args.audio:
@@ -137,6 +157,22 @@ def main() -> int:
         sd = sherpa_onnx.OfflineSpeakerDiarization(diar_cfg)
         diar = [(r.speaker, int(r.start * 1000), int(r.end * 1000)) for r in sd.process(samples).sort_by_start_time()]
         del sd
+        # Второй проход (как в приложении): участки речи VAD → отпечатки голоса → группировка.
+        units = speech_units(speech, diar)
+        labels = None
+        if cfg.get("regroupSpeakers", True) and not args.no_regroup and len(units) >= 2:
+            ext = sherpa_onnx.SpeakerEmbeddingExtractor(sherpa_onnx.SpeakerEmbeddingExtractorConfig(
+                model=args.embedding or str(m / "diarization/embedding.onnx"), num_threads=cfg["numThreads"]))
+            pad = cfg.get("embeddingPaddingMs", 200); E = []
+            for i, (a, b) in enumerate(units):
+                lo = min(max(a - pad, units[i - 1][1] if i else 0), a)
+                hi = max(min(b + pad, units[i + 1][0] if i + 1 < len(units) else duration_ms), b)
+                st = ext.create_stream(); st.accept_waveform(SR, samples[lo * SR // 1000: hi * SR // 1000]); st.input_finished()
+                E.append(ext.compute(st))
+            labels = cluster_speakers(E, cfg["numSpeakers"], cfg.get("minSpeakerSilhouette", 0.10))
+            del ext
+        if units:
+            diar = label_units(units, labels, diar)
         if not diar:
             diar = [(0, a, b) for a, b in speech]
         tick("DIARIZATION", t0)

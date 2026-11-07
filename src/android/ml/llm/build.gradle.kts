@@ -28,4 +28,5 @@ dependencies {
     // TODO(роль 4): implementation(libs.litertlm.android) — подключить вместе с LiteRtLmEngine.
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    implementation(libs.litertlm.android)
 }

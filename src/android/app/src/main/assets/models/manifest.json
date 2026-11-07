@@ -70,12 +70,12 @@
     {
       "id": "diarization.embedding",
       "path": "diarization/embedding.onnx",
-      "sizeBytes": 29596978,
-      "sha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
-      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+      "sizeBytes": 28281138,
+      "sha256": "f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",
       "license": "Apache-2.0",
-      "purpose": "Диаризация: отпечатки голоса 3D-Speaker CAM++ (VoxCeleb)",
-      "version": "campplus_sv_en_voxceleb_16k",
+      "purpose": "Диаризация: отпечатки голоса 3D-Speaker CAM++ (zh-cn 16k common)",
+      "version": "campplus_sv_zh-cn_16k-common",
       "required": true
     },
     {

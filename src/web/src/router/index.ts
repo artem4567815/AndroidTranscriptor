@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from '@ionic/vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useModelsStore } from '@/stores/models'
 
@@ -27,10 +27,16 @@ const router = createRouter({
   routes,
 })
 
+router.beforeEach((to, from) => {
+  const forward = to.path.split('/').length >= from.path.split('/').length
+  to.meta.transition = forward ? 'slide-forward' : 'slide-back'
+})
+
 // Пока модели не подготовлены, все пути ведут на страницу первого запуска.
 router.beforeEach((to) => {
   const models = useModelsStore()
-  if (!models.ready && to.name !== 'setup') {
+  // ready — это ref: проверяем .value, иначе объект ref всегда «истинный» и экран моделей не откроется.
+  if (!models.ready.value && to.name !== 'setup') {
     return { name: 'setup', query: { next: to.fullPath } }
   }
 })

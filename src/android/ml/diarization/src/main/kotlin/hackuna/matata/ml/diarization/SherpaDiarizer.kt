@@ -6,12 +6,14 @@ import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarizationConfig
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarizationSegment
 import com.k2fsa.sherpa.onnx.OfflineSpeakerSegmentationModelConfig
 import com.k2fsa.sherpa.onnx.OfflineSpeakerSegmentationPyannoteModelConfig
+import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractor
 import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig
 import hackuna.matata.core.model.Diarizer
 import hackuna.matata.core.model.ErrorCode
 import hackuna.matata.core.model.PcmAudio
 import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.SpeakerSegment
+import hackuna.matata.core.model.SpeechRegion
 import hackuna.matata.core.model.StenoException
 import hackuna.matata.ml.runtime.ModelManager
 import hackuna.matata.ml.sherpa.SherpaRuntime
@@ -23,6 +25,10 @@ class SherpaDiarizer(
 ) : Diarizer {
 
     private val sd: OfflineSpeakerDiarization
+    private val embeddingModel: String = models.require(DiarizationModelIds.EMBEDDING)
+
+    /** Модель отпечатков для второго прохода — создаётся, только если он нужен. */
+    private var extractor: SpeakerEmbeddingExtractor? = null
 
     init {
         if (!SherpaRuntime.isAvailable()) {
@@ -39,7 +45,7 @@ class SherpaDiarizer(
                     numThreads = config.numThreads,
                 ),
                 embedding = SpeakerEmbeddingExtractorConfig(
-                    model = models.require(DiarizationModelIds.EMBEDDING),
+                    model = embeddingModel,
                     numThreads = config.numThreads,
                 ),
                 clustering = DiarizationMapping.clustering(config),
@@ -63,7 +69,36 @@ class SherpaDiarizer(
         return DiarizationMapping.toSpeakerSegments(raw)
     }
 
-    override fun close() = sd.release()
+    /**
+     * Второй проход: отпечаток голоса для каждого участка речи (с запасом [PipelineConfig.embeddingPaddingMs]
+     * только в тишину) и группировка [SpeakerClustering]. Точнее sherpa на коротких репликах.
+     */
+    override fun labelUnits(audio: PcmAudio, units: List<SpeechRegion>, config: PipelineConfig): List<Int> {
+        if (units.isEmpty()) return emptyList()
+        val ext = extractor ?: SpeakerEmbeddingExtractor(
+            config = SpeakerEmbeddingExtractorConfig(model = embeddingModel, numThreads = config.numThreads),
+        ).also { extractor = it }
+        val pad = config.embeddingPaddingMs
+        val embeddings = units.mapIndexed { i, u ->
+            val from = maxOf(u.startMs - pad, units.getOrNull(i - 1)?.endMs ?: 0L).coerceAtMost(u.startMs)
+            val to = minOf(u.endMs + pad, units.getOrNull(i + 1)?.startMs ?: audio.durationMs).coerceAtLeast(u.endMs)
+            val stream = ext.createStream()
+            try {
+                stream.acceptWaveform(audio.slice(from, to), audio.sampleRate)
+                stream.inputFinished()
+                if (ext.isReady(stream)) ext.compute(stream) else null // слишком короткий кусок
+            } finally {
+                stream.release()
+            }
+        }
+        return SpeakerClustering.cluster(embeddings, config.numSpeakers, config.minSpeakerSilhouette).toList()
+    }
+
+    override fun close() {
+        sd.release()
+        extractor?.release()
+        extractor = null
+    }
 
     private companion object {
         const val MIN_DURATION_ON_SEC = 0.2f

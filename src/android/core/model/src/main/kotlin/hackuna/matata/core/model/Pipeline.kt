@@ -31,6 +31,15 @@ data class PipelineConfig(
      * число спикеров нестабильно (docs/TESTS.md). Менять только по DER на своих размеченных записях.
      */
     val diarizationWindowShift: Float = 0.1f,
+    /**
+     * Второй проход диаризации: участки речи (VAD) группируются по отпечаткам голоса.
+     * На коротких репликах и при «размытых» голосах заметно точнее, чем один sherpa (docs/TESTS.md).
+     */
+    val regroupSpeakers: Boolean = true,
+    /** Запас по краям участка для отпечатка голоса, мс (только в тишину, не в соседний участок). */
+    val embeddingPaddingMs: Long = 200,
+    /** Режим «Авто»: если разбиение на группы хуже этого «силуэта», считаем, что говорит один человек. */
+    val minSpeakerSilhouette: Float = 0.10f,
 )
 
 data class TranscriptionResult(
@@ -68,6 +77,13 @@ interface VoiceActivityDetector : Closeable {
 
 interface Diarizer : Closeable {
     fun diarize(audio: PcmAudio, config: PipelineConfig, onProgress: (Float) -> Unit): List<SpeakerSegment>
+
+    /**
+     * Второй проход: номер спикера для каждого готового участка речи по отпечаткам голоса
+     * (участки отсортированы и не пересекаются). null — реализация не умеет, тогда остаются
+     * метки первого прохода ([diarize]).
+     */
+    fun labelUnits(audio: PcmAudio, units: List<SpeechRegion>, config: PipelineConfig): List<Int>? = null
 }
 
 interface SpeechRecognizer : Closeable {

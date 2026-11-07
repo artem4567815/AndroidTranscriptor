@@ -54,6 +54,10 @@ internal object JsMapping {
         )
     }
 
+    /** Значения PipelineConfig по умолчанию — единственный источник правды для экрана настроек. */
+    fun pipelineDefaults(): JSObject =
+        JSObject(TranscriptJson.strict.encodeToString(PipelineConfig.serializer(), PipelineConfig()))
+
     /** PipelineOptions из Vue поверх значений по умолчанию PipelineConfig. */
     fun pipelineConfig(o: JSObject?, base: PipelineConfig = PipelineConfig()): PipelineConfig {
         if (o == null) return base
@@ -64,6 +68,12 @@ internal object JsMapping {
             numThreads = o.optInt("numThreads", base.numThreads).coerceIn(1, 16),
             clusterThreshold = o.optDouble("clusterThreshold", base.clusterThreshold.toDouble()).toFloat(),
             vadThreshold = o.optDouble("vadThreshold", base.vadThreshold.toDouble()).toFloat(),
+            regroupSpeakers = o.optBoolean("regroupSpeakers", base.regroupSpeakers),
+            minSpeakerSilhouette = o.optDouble("minSpeakerSilhouette", base.minSpeakerSilhouette.toDouble()).toFloat(),
+            embeddingPaddingMs = o.optLong("embeddingPaddingMs", base.embeddingPaddingMs).coerceIn(0, 2000),
+            mergeGapMs = o.optLong("mergeGapMs", base.mergeGapMs).coerceIn(0, 5000),
+            diarizationWindowShift = o.optDouble("diarizationWindowShift", base.diarizationWindowShift.toDouble())
+                .toFloat().coerceIn(0.02f, 1f),
         )
     }
 }
