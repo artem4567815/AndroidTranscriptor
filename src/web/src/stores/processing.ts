@@ -1,5 +1,12 @@
 import { computed, reactive, ref } from 'vue'
-import { getSteno, STAGES, type FailedEvent, type PipelineOptions, type Stage } from '@/native'
+import {
+  getSteno,
+  STAGES,
+  type FailedEvent,
+  type PipelineOptions,
+  type Stage,
+  type StenoPlugin,
+} from '@/native'
 import { errorMessage } from '@/utils/errors'
 import { ru } from '@/i18n/ru'
 import { useRecordingsStore } from './recordings'
@@ -28,6 +35,7 @@ const finishedAt = ref<number | null>(null)
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
 let listening: Promise<void> | null = null
+let listeningPlugin: StenoPlugin | null = null
 
 const elapsedMs = computed(() =>
   startedAt.value ? (finishedAt.value ?? now.value) - startedAt.value : 0,
@@ -45,9 +53,14 @@ function stopTicker() {
 }
 
 /** Подписка на события плагина — один раз за жизнь приложения. */
-function ensureListeners(): Promise<void> {
-  listening ??= (async () => {
-    const steno = await getSteno()
+async function ensureListeners(): Promise<void> {
+  const steno = await getSteno()
+  if (listeningPlugin === steno && listening) {
+    await listening
+    return
+  }
+  listeningPlugin = steno
+  listening = (async () => {
     await steno.addListener('progress', (e) => {
       if (e.id !== recordingId.value) return
       // Все этапы до текущего считаем завершёнными: события могут прийти пачкой.
@@ -74,7 +87,7 @@ function ensureListeners(): Promise<void> {
       useRecordingsStore().setStatus(e.id, e.code === 'CANCELLED' ? 'NEW' : 'ERROR')
     })
   })()
-  return listening
+  await listening
 }
 
 /** Подготовить состояние страницы для записи (без запуска). */
