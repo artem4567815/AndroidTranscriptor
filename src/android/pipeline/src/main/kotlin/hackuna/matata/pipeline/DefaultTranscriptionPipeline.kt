@@ -9,6 +9,7 @@ import hackuna.matata.core.model.PcmAudio
 import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.PipelineEvent
 import hackuna.matata.core.model.PostProcessorFactory
+import hackuna.matata.core.model.RecognizedSegment
 import hackuna.matata.core.model.SpeakerText
 import hackuna.matata.core.model.SpeechRecognizerFactory
 import hackuna.matata.core.model.Stage
@@ -90,7 +91,7 @@ class DefaultTranscriptionPipeline(
                         currentCoroutineContext().ensureActive()
                         val r = asr.recognize(audio.slice(c.audioStartMs, c.audioEndMs), audio.sampleRate)
                         send(PipelineEvent.Progress(Stage.ASR, (i + 1).toFloat() / chunks.size))
-                        SpeakerText(c.speaker, c.startMs, c.endMs, r.text)
+                        speakerText(c, r)
                     }
                 }
             }
@@ -119,6 +120,20 @@ class DefaultTranscriptionPipeline(
         }
     }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.Default)
 
+    private fun speakerText(chunk: AsrChunk, recognized: RecognizedSegment): SpeakerText {
+        val original = SpeakerText(chunk.speaker, chunk.startMs, chunk.endMs, recognized.text)
+        val audioLengthMs = chunk.audioEndMs - chunk.audioStartMs
+        val wordTokenStarts = recognized.tokens
+            .filter { it.startMs >= 0 && it.startMs < audioLengthMs && it.text.any(Char::isLetterOrDigit) }
+            .map { chunk.audioStartMs + it.startMs }
+        val first = wordTokenStarts.minOrNull() ?: return original
+        val last = wordTokenStarts.max()
+        val start = maxOf(chunk.startMs, first)
+        // ASR отдаёт только начало токена. Оставляем запас на его произнесение.
+        val end = minOf(chunk.endMs, chunk.audioEndMs, last + LAST_TOKEN_TAIL_MS)
+        return if (start < end) original.copy(startMs = start, endMs = end) else original
+    }
+
     private data class LlmOutput(val protocol: String?, val roles: Map<String, String>, val corrected: Transcript?)
 
     /** LLM — необязательный этап: его сбой не валит обработку, сырой ASR остаётся. */
@@ -145,5 +160,6 @@ class DefaultTranscriptionPipeline(
 
     companion object {
         const val TAG = "Pipeline"
+        private const val LAST_TOKEN_TAIL_MS = 200L
     }
 }

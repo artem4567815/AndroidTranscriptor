@@ -209,7 +209,20 @@ def main() -> int:
             stream = rec.create_stream()
             stream.accept_waveform(SR, samples[aa * SR // 1000: bb * SR // 1000])
             rec.decode_stream(stream)
-            texts.append(SpeakerText(spk, a, b, stream.result.text))
+            result = stream.result
+            starts = [
+                aa + int(seconds * 1000)
+                for token, seconds in zip(result.tokens, result.timestamps)
+                if 0 <= seconds * 1000 < bb - aa and any(c.isalnum() for c in token)
+            ]
+            start, end = a, b
+            if starts:
+                refined_start = max(a, min(starts))
+                # Как в Android: метки содержат только начало токена.
+                refined_end = min(b, bb, max(starts) + 200)
+                if refined_start < refined_end:
+                    start, end = refined_start, refined_end
+            texts.append(SpeakerText(spk, start, end, result.text))
         del rec
         tick("ASR", t0)
 

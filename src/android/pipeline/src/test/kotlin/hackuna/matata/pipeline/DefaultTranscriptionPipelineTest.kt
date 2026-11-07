@@ -19,6 +19,7 @@ import hackuna.matata.core.model.SpeechRegion
 import hackuna.matata.core.model.Stage
 import hackuna.matata.core.model.StenoException
 import hackuna.matata.core.model.Transcript
+import hackuna.matata.core.model.TimedToken
 import hackuna.matata.core.model.TranscriptPostProcessor
 import hackuna.matata.core.model.VadFactory
 import hackuna.matata.core.model.VoiceActivityDetector
@@ -87,9 +88,10 @@ class DefaultTranscriptionPipelineTest {
     private fun pipeline(
         asrFactory: SpeechRecognizerFactory = asr,
         llmFactory: LlmEngineFactory = llm,
+        vadFactory: VadFactory = vad,
     ): DefaultTranscriptionPipeline {
         var t = 0L
-        return DefaultTranscriptionPipeline(decoder, pre, vad, diar, asrFactory, llmFactory, pp, nowMs = { t += 10; t }, log = {})
+        return DefaultTranscriptionPipeline(decoder, pre, vadFactory, diar, asrFactory, llmFactory, pp, nowMs = { t += 10; t }, log = {})
     }
 
     @Test
@@ -109,6 +111,44 @@ class DefaultTranscriptionPipelineTest {
         assertTrue(events.any { it is PipelineEvent.Progress && it.stage == Stage.DIARIZATION && it.fraction == 0.4f })
         assertEquals(listOf("vad", "diar", "asr", "llm"), opened)
         assertEquals(listOf("vad", "diar", "asr", "llm"), closed)
+    }
+
+    @Test
+    fun `метки ASR учитывают паддинг и ограничиваются сегментом`() = runTest {
+        // Пауза VAD сохраняет три отдельных фрагмента после повторной разметки спикеров.
+        val separatedVad = VadFactory {
+            object : VoiceActivityDetector {
+                override fun detect(audio: PcmAudio) = listOf(
+                    SpeechRegion(0, 2000), SpeechRegion(2300, 4000), SpeechRegion(5000, 9000),
+                )
+                override fun close() { closed += "vad" }
+            }
+        }
+        var index = 0
+        val timedAsr = SpeechRecognizerFactory {
+            object : SpeechRecognizer {
+                override fun recognize(samples: FloatArray, sampleRate: Int): RecognizedSegment {
+                    val tokens = when (index++) {
+                        0 -> listOf(TimedToken("раз", 300), TimedToken("два", 1950))
+                        1 -> emptyList()
+                        else -> listOf(
+                            TimedToken("ошибка", -1), TimedToken("три", 350),
+                            TimedToken("четыре", 1000), TimedToken(".", 4000),
+                            TimedToken("ошибка", Long.MAX_VALUE),
+                        )
+                    }
+                    return RecognizedSegment(0, samples.size * 1000L / sampleRate, "текст", tokens)
+                }
+                override fun close() {}
+            }
+        }
+        val result = pipeline(asrFactory = timedAsr, vadFactory = separatedVad)
+            .run("x", PipelineConfig(mergeGapMs = 0, segmentPaddingMs = 150)).toList().last() as PipelineEvent.Completed
+        assertEquals(3, index)
+        assertEquals(
+            listOf(300L to 2000L, 2300L to 4000L, 5200L to 6050L),
+            result.result.transcript.transcript.map { it.startMs to it.endMs },
+        )
     }
 
     @Test
