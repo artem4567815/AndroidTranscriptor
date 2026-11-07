@@ -76,6 +76,10 @@ class StenoPlugin : Plugin(), KoinComponent {
                         JSObject().put("id", e.id).put("stage", e.stage.name).put("fraction", e.fraction.toDouble()),
                     )
                     is TranscriptionController.Event.Completed -> notifyListeners("completed", JSObject().put("id", e.id))
+                    is TranscriptionController.Event.Analysis -> notifyListeners(
+                        "analysis",
+                        JSObject().put("id", e.id).put("running", e.running),
+                    )
                     is TranscriptionController.Event.Failed -> notifyListeners(
                         "failed",
                         JSObject().put("id", e.id).put("stage", e.stage.name).put("code", e.code.name).put("message", e.message),
@@ -226,7 +230,7 @@ class StenoPlugin : Plugin(), KoinComponent {
     fun getResult(call: PluginCall) = io(call) {
         val id = call.requireString("id")
         val r = repo.getResult(id) ?: throw StenoException(ErrorCode.UNKNOWN, "Нет расшифровки для $id")
-        call.resolve(JsMapping.result(r))
+        call.resolve(JsMapping.result(r, analysisPending = controller.analyzingId == id))
     }
 
     @PluginMethod

@@ -63,6 +63,22 @@ def load_audio(path: str):
     return mono
 
 
+SHORT_UNIT_MS = 1500
+SHORT_UNIT_SHIFTS = [(0, 0), (100, 0), (0, 100), (100, 100), (-100, -100)]
+
+
+def short_unit_embedding(ext, samples, a, b, lo, hi, duration_ms):
+    """Порт SherpaDiarizer.labelUnits для коротких участков: среднее нормированных отпечатков со сдвигом краёв."""
+    import numpy as np
+    vs = []
+    for dl, dr in SHORT_UNIT_SHIFTS:
+        x0, x1 = (min(a, lo - dl), max(b, hi + dr)) if dl < 0 else (max(0, lo - dl), min(duration_ms, hi + dr))
+        st = ext.create_stream(); st.accept_waveform(SR, samples[x0 * SR // 1000: x1 * SR // 1000]); st.input_finished()
+        if ext.is_ready(st):
+            v = np.array(ext.compute(st)); vs.append(v / max(np.linalg.norm(v), 1e-9))
+    return np.mean(vs, axis=0) if vs else None
+
+
 def main() -> int:
     args = parse_args()
     try:
@@ -167,6 +183,10 @@ def main() -> int:
             for i, (a, b) in enumerate(units):
                 lo = min(max(a - pad, units[i - 1][1] if i else 0), a)
                 hi = max(min(b + pad, units[i + 1][0] if i + 1 < len(units) else duration_ms), b)
+                if b - a < SHORT_UNIT_MS:  # как SherpaDiarizer.labelUnits: среднее нескольких отпечатков
+                    v = short_unit_embedding(ext, samples, a, b, lo, hi, duration_ms)
+                    if v is not None:
+                        E.append(v); continue
                 st = ext.create_stream(); st.accept_waveform(SR, samples[lo * SR // 1000: hi * SR // 1000]); st.input_finished()
                 E.append(ext.compute(st))
             labels = cluster_speakers(E, cfg["numSpeakers"], cfg.get("minSpeakerSilhouette", 0.10))
@@ -209,20 +229,8 @@ def main() -> int:
             stream = rec.create_stream()
             stream.accept_waveform(SR, samples[aa * SR // 1000: bb * SR // 1000])
             rec.decode_stream(stream)
-            result = stream.result
-            starts = [
-                aa + int(seconds * 1000)
-                for token, seconds in zip(result.tokens, result.timestamps)
-                if 0 <= seconds * 1000 < bb - aa and any(c.isalnum() for c in token)
-            ]
-            start, end = a, b
-            if starts:
-                refined_start = max(a, min(starts))
-                # Как в Android: метки содержат только начало токена.
-                refined_end = min(b, bb, max(starts) + 200)
-                if refined_start < refined_end:
-                    start, end = refined_start, refined_end
-            texts.append(SpeakerText(spk, start, end, result.text))
+            # Границы — по участку VAD, как в приложении (DefaultTranscriptionPipeline.speakerText).
+            texts.append(SpeakerText(spk, a, b, stream.result.text))
         del rec
         tick("ASR", t0)
 

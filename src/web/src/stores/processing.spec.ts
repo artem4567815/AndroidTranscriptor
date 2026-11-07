@@ -62,6 +62,30 @@ describe('processing store + мок', () => {
     await waitFor(() => !p.running.value)
     expect(p.failure.value?.code).toBe('CANCELLED')
   })
+
+  it('расшифровка сразу, итоги и имена — после анализа, правки пользователя целы', async () => {
+    mock.devSetSpeed(20)
+    const p = useProcessingStore()
+    await p.start('2', options)
+    await waitFor(() => p.completed.value)
+
+    const t = useTranscriptStore()
+    await t.load('2')
+    // Расшифровка уже есть, итогов ещё нет — идёт анализ.
+    expect(t.utterances.value.length).toBeGreaterThan(0)
+    expect(t.result.value?.protocol).toBeUndefined()
+    expect(t.analysisPending.value).toBe(true)
+
+    // Пока идёт анализ, пользователь правит реплику и переименовывает спикера.
+    await t.updateText(0, 'Моя правка')
+    await t.renameSpeaker('speaker_2', 'Мурзик')
+
+    await waitFor(() => !t.analysisPending.value)
+    expect(t.result.value?.protocol).toBeTruthy()
+    expect(t.utterances.value[0].text).toBe('Моя правка')
+    expect(t.speakerNames.value.speaker_2).toBe('Мурзик')
+    expect(t.speakerNames.value.speaker_1).toBe('Председатель') // имя от анализа
+  })
 })
 
 describe('transcript store', () => {

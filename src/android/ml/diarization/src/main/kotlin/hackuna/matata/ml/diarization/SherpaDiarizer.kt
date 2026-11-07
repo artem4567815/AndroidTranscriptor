@@ -72,6 +72,10 @@ class SherpaDiarizer(
     /**
      * Второй проход: отпечаток голоса для каждого участка речи (с запасом [PipelineConfig.embeddingPaddingMs]
      * только в тишину) и группировка [SpeakerClustering]. Точнее sherpa на коротких репликах.
+     *
+     * Короткий участок (< [DiarizationMapping.SHORT_UNIT_MS]) — среднее нескольких отпечатков со сдвигом краёв
+     * на 100 мс: один отпечаток по 0,5–1 с речи «дрожит», и реплика переходит от спикера к спикеру от громкости
+     * на 1 дБ (игра в слова: DER 7,6% ↔ 23%, с усреднением — 2,5% в обоих случаях, docs/TESTS.md).
      */
     override fun labelUnits(audio: PcmAudio, units: List<SpeechRegion>, config: PipelineConfig): List<Int> {
         if (units.isEmpty()) return emptyList()
@@ -82,16 +86,27 @@ class SherpaDiarizer(
         val embeddings = units.mapIndexed { i, u ->
             val from = maxOf(u.startMs - pad, units.getOrNull(i - 1)?.endMs ?: 0L).coerceAtMost(u.startMs)
             val to = minOf(u.endMs + pad, units.getOrNull(i + 1)?.startMs ?: audio.durationMs).coerceAtLeast(u.endMs)
-            val stream = ext.createStream()
-            try {
-                stream.acceptWaveform(audio.slice(from, to), audio.sampleRate)
-                stream.inputFinished()
-                if (ext.isReady(stream)) ext.compute(stream) else null // слишком короткий кусок
-            } finally {
-                stream.release()
+            if (u.endMs - u.startMs < DiarizationMapping.SHORT_UNIT_MS) {
+                val crops = DiarizationMapping.shortUnitCrops(u, from, to, audio.durationMs)
+                DiarizationMapping.average(crops.mapNotNull { (a, b) -> embed(ext, audio, a, b) })
+                    ?: embed(ext, audio, from, to)
+            } else {
+                embed(ext, audio, from, to)
             }
         }
         return SpeakerClustering.cluster(embeddings, config.numSpeakers, config.minSpeakerSilhouette).toList()
+    }
+
+    /** Отпечаток голоса куска [fromMs, toMs) или null, если кусок слишком короткий. */
+    private fun embed(ext: SpeakerEmbeddingExtractor, audio: PcmAudio, fromMs: Long, toMs: Long): FloatArray? {
+        val stream = ext.createStream()
+        try {
+            stream.acceptWaveform(audio.slice(fromMs, toMs), audio.sampleRate)
+            stream.inputFinished()
+            return if (ext.isReady(stream)) ext.compute(stream) else null
+        } finally {
+            stream.release()
+        }
     }
 
     override fun close() {
@@ -115,6 +130,32 @@ internal class ProgressCallback(private val onProgress: (Float) -> Unit) : (Int,
 }
 
 internal object DiarizationMapping {
+
+    /** Участки короче — несколько отпечатков со сдвигом краёв (см. [SherpaDiarizer.labelUnits]). */
+    const val SHORT_UNIT_MS = 1500L
+
+    /** Сдвиги (влево, вправо) в мс; отрицательные — окно сужается, но не уже самого участка. */
+    private val SHORT_UNIT_SHIFTS = listOf(0L to 0L, 100L to 0L, 0L to 100L, 100L to 100L, -100L to -100L)
+
+    fun shortUnitCrops(unit: SpeechRegion, from: Long, to: Long, durationMs: Long): List<Pair<Long, Long>> =
+        SHORT_UNIT_SHIFTS.map { (left, right) ->
+            if (left < 0) {
+                minOf(unit.startMs, from - left) to maxOf(unit.endMs, to + right)
+            } else {
+                maxOf(0L, from - left) to minOf(durationMs, to + right)
+            }
+        }
+
+    /** Среднее нормированных векторов (направление голоса, а не громкость), null — если нечего усреднять. */
+    fun average(vectors: List<FloatArray>): FloatArray? {
+        if (vectors.isEmpty()) return null
+        val out = FloatArray(vectors[0].size)
+        for (v in vectors) {
+            val norm = kotlin.math.sqrt(v.sumOf { it.toDouble() * it }).coerceAtLeast(1e-9)
+            for (k in out.indices) out[k] += (v[k] / norm).toFloat() / vectors.size
+        }
+        return out
+    }
 
     fun clustering(config: PipelineConfig) = FastClusteringConfig(
         numClusters = if (config.numSpeakers > 0) config.numSpeakers else -1,

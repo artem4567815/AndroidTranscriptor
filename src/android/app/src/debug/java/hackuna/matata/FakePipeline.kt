@@ -1,5 +1,6 @@
 package hackuna.matata
 
+import hackuna.matata.core.model.Analysis
 import hackuna.matata.core.model.AudioDecoder
 import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.PipelineEvent
@@ -8,6 +9,7 @@ import hackuna.matata.core.model.Transcript
 import hackuna.matata.core.model.TranscriptionPipeline
 import hackuna.matata.core.model.TranscriptionResult
 import hackuna.matata.core.model.Utterance
+import hackuna.matata.core.model.wantsAnalysis
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -31,7 +33,7 @@ class FakePipeline(private val decoder: AudioDecoder) : TranscriptionPipeline {
             emit(PipelineEvent.Progress(Stage.DECODE, 1f))
             emit(PipelineEvent.StageDone(Stage.DECODE, timings[Stage.DECODE]!!))
 
-            for (s in listOf(Stage.PREPROCESS, Stage.VAD, Stage.DIARIZATION, Stage.ASR, Stage.MERGE, Stage.LLM)) {
+            for (s in listOf(Stage.PREPROCESS, Stage.VAD, Stage.DIARIZATION, Stage.ASR, Stage.MERGE)) {
                 stage = s
                 val ms = if (s == Stage.ASR || s == Stage.DIARIZATION) 1500L else 300L
                 for (i in 1..10) {
@@ -57,7 +59,7 @@ class FakePipeline(private val decoder: AudioDecoder) : TranscriptionPipeline {
                     TranscriptionResult(
                         transcript = Transcript(utterances),
                         llmCorrected = null,
-                        protocol = if (config.enableLlmProtocol) "[FakePipeline] Протокол появится после подключения LLM." else null,
+                        protocol = null,
                         speakerNames = emptyMap(),
                         timings = timings,
                         audioDurationMs = audio.durationMs,
@@ -69,5 +71,17 @@ class FakePipeline(private val decoder: AudioDecoder) : TranscriptionPipeline {
         } catch (e: Throwable) {
             emit(PipelineEvent.Failed(stage, e))
         }
+    }
+
+    /** Имитация LLM-анализа после показа расшифровки: пауза, затем итоги и роли. */
+    override suspend fun analyze(transcript: Transcript, config: PipelineConfig): Analysis? {
+        if (!config.wantsAnalysis(transcript)) return null
+        delay(3000)
+        return Analysis(
+            protocol = if (config.enableLlmProtocol) "[FakePipeline] Итоги разговора появляются после расшифровки." else null,
+            roles = mapOf("speaker_1" to "Ведущий"),
+            corrected = null,
+            millis = 3000,
+        )
     }
 }

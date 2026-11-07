@@ -1,6 +1,7 @@
 package hackuna.matata.pipeline
 
 import android.util.Log
+import hackuna.matata.core.model.Analysis
 import hackuna.matata.core.model.AudioDecoder
 import hackuna.matata.core.model.AudioPreprocessor
 import hackuna.matata.core.model.DiarizerFactory
@@ -18,6 +19,7 @@ import hackuna.matata.core.model.Transcript
 import hackuna.matata.core.model.TranscriptionPipeline
 import hackuna.matata.core.model.TranscriptionResult
 import hackuna.matata.core.model.VadFactory
+import hackuna.matata.core.model.wantsAnalysis
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -98,25 +100,17 @@ class DefaultTranscriptionPipeline(
             }
 
             val transcript = step(Stage.MERGE) { UtteranceMerger.merge(texts, config) }
-            val asrOnly = TranscriptionResult(
-                transcript = transcript,
-                llmCorrected = null,
-                protocol = null,
-                speakerNames = emptyMap(),
-                timings = timings.toMap(),
-                audioDurationMs = audio.durationMs,
-            )
-            if (wantsLlm(transcript, config)) send(PipelineEvent.TranscriptReady(asrOnly))
 
-            val llm = step(Stage.LLM) { runLlm(transcript, config) }
-
+            // LLM здесь нет: расшифровка показывается сразу, анализ — отдельно (analyze), уже после показа.
             send(
                 PipelineEvent.Completed(
-                    asrOnly.copy(
-                        llmCorrected = llm.corrected,
-                        protocol = llm.protocol,
-                        speakerNames = llm.roles,
+                    TranscriptionResult(
+                        transcript = transcript,
+                        llmCorrected = null,
+                        protocol = null,
+                        speakerNames = emptyMap(),
                         timings = timings.toMap(),
+                        audioDurationMs = audio.durationMs,
                     ),
                 ),
             )
@@ -128,39 +122,32 @@ class DefaultTranscriptionPipeline(
         }
     }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.Default)
 
-    private fun speakerText(chunk: AsrChunk, recognized: RecognizedSegment): SpeakerText {
-        val original = SpeakerText(chunk.speaker, chunk.startMs, chunk.endMs, recognized.text)
-        val audioLengthMs = chunk.audioEndMs - chunk.audioStartMs
-        val wordTokenStarts = recognized.tokens
-            .filter { it.startMs >= 0 && it.startMs < audioLengthMs && it.text.any(Char::isLetterOrDigit) }
-            .map { chunk.audioStartMs + it.startMs }
-        val first = wordTokenStarts.minOrNull() ?: return original
-        val last = wordTokenStarts.max()
-        val start = maxOf(chunk.startMs, first)
-        // ASR отдаёт только начало токена. Оставляем запас на его произнесение.
-        val end = minOf(chunk.endMs, chunk.audioEndMs, last + LAST_TOKEN_TAIL_MS)
-        return if (start < end) original.copy(startMs = start, endMs = end) else original
-    }
-
-    private data class LlmOutput(val protocol: String?, val roles: Map<String, String>, val corrected: Transcript?)
-
-    private fun wantsLlm(t: Transcript, config: PipelineConfig) =
-        t.transcript.isNotEmpty() && (config.enableLlmProtocol || config.enableLlmCorrection)
+    /**
+     * Границы реплики — границы участка речи (VAD), а не метки токенов ASR. GigaAM отдаёт только начало
+     * токена; обрезка конца по «последний токен + 200 мс» отрезала последнее слово и ухудшила DER
+     * (игра 7,6% → 18,9%, планёрка 1,0% → 2,3%, docs/TESTS.md). Токены остаются в [RecognizedSegment].
+     */
+    private fun speakerText(chunk: AsrChunk, recognized: RecognizedSegment) =
+        SpeakerText(chunk.speaker, chunk.startMs, chunk.endMs, recognized.text)
 
     /**
-     * LLM — необязательный этап: его сбой не валит обработку, сырой ASR остаётся.
-     * Если протокол просили, но он не получился, вместо него — короткое объяснение для вкладки «Протокол».
+     * Анализ готовой расшифровки: имена спикеров из самопредставлений ([SpeakerNames], без LLM — работают и при
+     * сбое LLM) + итоги и правка от LLM. Сбой LLM не трогает расшифровку, вместо итогов — причина
+     * («Итоги не составлены: мало свободной памяти…»).
      */
-    private suspend fun runLlm(t: Transcript, config: PipelineConfig): LlmOutput {
-        if (!wantsLlm(t, config)) return LlmOutput(null, emptyMap(), null)
-        return try {
+    override suspend fun analyze(transcript: Transcript, config: PipelineConfig): Analysis? {
+        if (!config.wantsAnalysis(transcript)) return null
+        val t0 = nowMs()
+        val names = SpeakerNames.fromIntroductions(transcript)
+        val result = try {
             llmFactory.create(config).use { engine ->
                 val pp = postProcessorFactory.create(engine)
-                val protocol = if (config.enableLlmProtocol) pp.protocol(t) else null
-                LlmOutput(
-                    protocol = protocol?.text?.takeIf { it.isNotBlank() },
-                    roles = protocol?.roles.orEmpty(),
-                    corrected = if (config.enableLlmCorrection) pp.correct(t) else null,
+                val summary = if (config.enableLlmProtocol) pp.protocol(transcript) else null
+                Analysis(
+                    protocol = summary?.takeIf { it.isNotBlank() },
+                    roles = names,
+                    corrected = if (config.enableLlmCorrection) pp.correct(transcript) else null,
+                    millis = 0,
                 )
             }
         } catch (e: CancellationException) {
@@ -168,12 +155,14 @@ class DefaultTranscriptionPipeline(
         } catch (e: Throwable) {
             log("LLM skipped: $e")
             val reason = if (e is StenoException) e.message else "ошибка модели (${e.message ?: e.javaClass.simpleName})"
-            LlmOutput(if (config.enableLlmProtocol) "Протокол не составлен: $reason" else null, emptyMap(), null)
+            Analysis(if (config.enableLlmProtocol) "Итоги не составлены: $reason" else null, names, null, 0)
         }
+        val ms = nowMs() - t0
+        log("stage=${Stage.LLM} ms=$ms")
+        return result.copy(millis = ms)
     }
 
     companion object {
         const val TAG = "Pipeline"
-        private const val LAST_TOKEN_TAIL_MS = 200L
     }
 }

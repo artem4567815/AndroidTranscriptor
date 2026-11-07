@@ -4,6 +4,7 @@ import hackuna.matata.core.data.db.RecordingEntity
 import hackuna.matata.core.data.db.ResultEntity
 import hackuna.matata.core.data.db.StenoDao
 import hackuna.matata.core.data.db.UtteranceEntity
+import hackuna.matata.core.model.Analysis
 import hackuna.matata.core.model.ErrorCode
 import hackuna.matata.core.model.Stage
 import hackuna.matata.core.model.Transcript
@@ -26,12 +27,16 @@ interface TranscriptRepository {
 
     /**
      * После убийства процесса статус PROCESSING «застревает»: записи с сохранённым результатом
-     * (например, расшифровка готова, а процесс убили на этапе LLM) → DONE, остальные → ERROR.
+     * (например, при повторной обработке) → DONE, остальные → ERROR.
      */
     suspend fun resetStaleProcessing(): Int
+    suspend fun saveResult(id: String, result: TranscriptionResult)
 
-    /** [final] = false — черновик (расшифровка до LLM): статус остаётся PROCESSING. */
-    suspend fun saveResult(id: String, result: TranscriptionResult, final: Boolean = true)
+    /**
+     * Итог LLM-анализа поверх уже показанной расшифровки. Сырой ASR и правки пользователя не трогает:
+     * имена, которые пользователь задал сам, важнее предложенных LLM.
+     */
+    suspend fun saveAnalysis(id: String, analysis: Analysis)
     suspend fun getResult(id: String): StoredResult?
     suspend fun updateUtterance(id: String, index: Int, text: String?, speakerId: String?)
     suspend fun renameSpeaker(id: String, speakerId: String, name: String)
@@ -60,7 +65,7 @@ class RoomTranscriptRepository(private val dao: StenoDao) : TranscriptRepository
         dao.replaceStatusWithResult(RecordingStatus.PROCESSING.name, RecordingStatus.DONE.name) +
             dao.replaceStatus(RecordingStatus.PROCESSING.name, RecordingStatus.ERROR.name)
 
-    override suspend fun saveResult(id: String, result: TranscriptionResult, final: Boolean) {
+    override suspend fun saveResult(id: String, result: TranscriptionResult) {
         val rows = result.transcript.transcript.toRows(id, UtteranceEntity.RAW) +
             (result.llmCorrected?.transcript?.toRows(id, UtteranceEntity.LLM) ?: emptyList())
         val entity = ResultEntity(
@@ -71,7 +76,22 @@ class RoomTranscriptRepository(private val dao: StenoDao) : TranscriptRepository
             audioDurationMs = result.audioDurationMs,
             hasLlmCorrection = result.llmCorrected != null,
         )
-        dao.replaceResult(entity, rows, if (final) RecordingStatus.DONE.name else RecordingStatus.PROCESSING.name)
+        dao.replaceResult(entity, rows, RecordingStatus.DONE.name)
+    }
+
+    override suspend fun saveAnalysis(id: String, analysis: Analysis) {
+        val r = dao.getResult(id) ?: return // запись удалили, пока шёл анализ
+        val userNames = json.decodeFromString(namesSerializer, r.speakerNamesJson)
+        val timings = json.decodeFromString(timingsSerializer, r.timingsJson) + (Stage.LLM.name to analysis.millis)
+        dao.replaceAnalysis(
+            r.copy(
+                protocol = analysis.protocol,
+                speakerNamesJson = json.encodeToString(namesSerializer, analysis.roles + userNames),
+                timingsJson = json.encodeToString(timingsSerializer, timings),
+                hasLlmCorrection = analysis.corrected != null,
+            ),
+            analysis.corrected?.transcript?.toRows(id, UtteranceEntity.LLM).orEmpty(),
+        )
     }
 
     override suspend fun getResult(id: String): StoredResult? {

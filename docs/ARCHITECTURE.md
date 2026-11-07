@@ -31,7 +31,7 @@
 | `ml/sherpa` | `…ml.sherpa` | `.so` + официальные Kotlin API sherpa-onnx (пакет `com.k2fsa.sherpa.onnx`) | роль 2 |
 | `ml/asr` | `…ml.asr` | `GigaAmSpeechRecognizer` (заглушка) | роль 2 |
 | `ml/diarization` | `…ml.diarization` | `SileroVoiceActivityDetector`, `SherpaDiarizer` (заглушки) | роль 3 |
-| `ml/llm` | `…ml.llm` | `LiteRtLmEngine` (Qwen3-1.7B на LiteRT-LM), `LlmTranscriptPostProcessor` (промпты, разбор протокола и ролей), `LlmMemoryGuard`, `LlmWeightCache` | роль 4 |
+| `ml/llm` | `…ml.llm` | `LiteRtLmEngine` (Qwen3-1.7B на LiteRT-LM), `LlmTranscriptPostProcessor` (промпт итогов, правка), `LlmMemoryGuard`, `LlmWeightCache` | роль 4 |
 | `pipeline` | `…pipeline` | `DefaultTranscriptionPipeline`, `SegmentPlanner`, `UtteranceMerger` | роль 3 |
 
 **Правила зависимостей:** `core/model` ни от чего не зависит (кроме kotlinx.serialization и coroutines);
@@ -49,8 +49,8 @@
 | DIARIZATION | `ml/diarization` | pyannote + 3D-Speaker → `SpeakerSegment`; если пусто — один спикер на всю речь |
 | ASR | `ml/asr` + `pipeline/SegmentPlanner` | каждый сегмент говорящего отдельно, с паддингом 150 мс; длиннее 20 с — режется по паузам VAD |
 | MERGE | `pipeline/UtteranceMerger` | склейка соседних реплик одного спикера (пауза < 700 мс), выброс пустых, перенумерация `speaker_N`, `start < end`, сортировка |
-| LLM | `ml/llm` | протокол, роли спикеров, правка (отдельно в `llmCorrected`); сбой LLM не валит обработку |
-| SAVE | `app/TranscriptionController` | запись в Room; статус DONE |
+| SAVE | `app/TranscriptionController` | запись в Room; статус DONE; событие `completed` — пользователь видит расшифровку |
+| LLM (после показа) | `pipeline.analyze` + `ml/llm` + `pipeline/SpeakerNames` | итоги разговора свободным текстом, имена из самопредставлений («Я Лёша»), правка (`llmCorrected`); события `analysis` (идёт / готово), `saveAnalysis` не трогает правки пользователя; сбой LLM — объяснение во вкладке «Итоги»; в RTF не входит |
 
 Каждый движок создаётся фабрикой (`VadFactory`, `DiarizerFactory`, …) прямо перед этапом и закрывается
 после (`use {}`): в памяти одна модель за раз. Время этапов — в лог с тегом `Pipeline` и в `timings`

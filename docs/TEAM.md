@@ -35,11 +35,11 @@
 ## Роль 2 — ASR, устройство и релиз
 
 - [ ] `scripts/download_models.sh`: скачать модели, зафиксировать sha256 сегментации и CAM++
-- [ ] `GigaAmSpeechRecognizer` на sherpa-onnx `OfflineRecognizer` (транcдьюсер GigaAM v3 punct)
+- [x] `GigaAmSpeechRecognizer` на sherpa-onnx `OfflineRecognizer` (транcдьюсер GigaAM v3 punct)
 - [ ] Замеры RTF на 2–3 телефонах, подбор `numThreads`, сравнение transducer vs CTC
 - [ ] Шумоподавление по флагу `enableDenoise` (`OfflineSpeechDenoiser`) — только если улучшает WER
 - [ ] Проверка декодера на mp3/m4a/ogg/wav/amr с разными частотами
-- [ ] Подпись, `scripts/build_release.sh`, публикация APK в Releases, проверка в авиарежиме
+- [ ] Подпись и `scripts/build_release.sh` работают (0.2.0); осталось: публикация APK в Releases, проверка на телефоне в авиарежиме
 
 ## Роль 3 — Диаризация, пайплайн и мост
 
@@ -48,7 +48,7 @@
 - [x] `SileroVoiceActivityDetector` и `SherpaDiarizer` на sherpa-onnx (проверено на эмуляторе)
 - [ ] Свои русские записи с разметкой «кто когда говорил» для DER
 - [ ] Подбор `clusterThreshold`, `mergeGapMs`, `segmentPaddingMs` на стенде (DER, ошибка границ)
-- [ ] Границы реплик: уточнение по таймштампам токенов ASR (`RecognizedSegment.tokens`)
+- [x] Границы реплик по токенам ASR — проверено на стенде, хуже границ VAD (DER 7,6% → 18,9%), отключено в 0.2.0
 - [ ] `StenoPlugin`: импорт, запись, обработка проверены на эмуляторе; экспорт/шаринг и разрешения на 2–3 версиях Android — нет
 - [ ] `TranscriptionService`: поведение при сворачивании и нехватке памяти, тест на длинной записи (1 ч)
 - [ ] Обработка `OUT_OF_MEMORY` и отмены на каждом этапе

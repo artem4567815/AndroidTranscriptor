@@ -50,17 +50,27 @@ data class TranscriptionResult(
     val timings: Map<Stage, Long>,
     val audioDurationMs: Long,
 ) {
-    val rtf: Double get() = if (audioDurationMs <= 0) 0.0 else timings.values.sum().toDouble() / audioDurationMs
+    /** Скорость расшифровки. LLM не входит: анализ идёт уже после показа результата. */
+    val rtf: Double get() = rtfOf(timings, audioDurationMs)
 }
+
+fun rtfOf(timings: Map<Stage, Long>, audioDurationMs: Long): Double =
+    if (audioDurationMs <= 0) 0.0 else timings.filterKeys { it != Stage.LLM }.values.sum().toDouble() / audioDurationMs
+
+/**
+ * Итог LLM-анализа — после того как пользователь уже видит расшифровку.
+ * [protocol] — итоги разговора (или объяснение, почему их нет), [roles] — speaker_N → имя или роль.
+ */
+data class Analysis(
+    val protocol: String?,
+    val roles: Map<String, String>,
+    val corrected: Transcript?,
+    val millis: Long,
+)
 
 sealed interface PipelineEvent {
     data class Progress(val stage: Stage, val fraction: Float) : PipelineEvent
     data class StageDone(val stage: Stage, val millis: Long) : PipelineEvent
-    /**
-     * Расшифровка готова, дальше идёт долгий и тяжёлый по памяти этап LLM. Контроллер сохраняет
-     * её сразу: если систему убьют за нехватку памяти во время LLM, расшифровка не потеряется.
-     */
-    data class TranscriptReady(val result: TranscriptionResult) : PipelineEvent
     data class Completed(val result: TranscriptionResult) : PipelineEvent
     data class Failed(val stage: Stage, val error: Throwable) : PipelineEvent
 }
@@ -100,20 +110,25 @@ interface LlmEngine : Closeable {
     suspend fun generate(prompt: String, maxTokens: Int, system: String? = null): String
 }
 
-/**
- * Протокол и роли участников (speaker_N → «Ведущий»). Получаются ОДНИМ запросом к LLM:
- * модель читает расшифровку один раз — это самая долгая часть генерации на телефоне.
- */
-data class MeetingProtocol(val text: String, val roles: Map<String, String>)
-
 interface TranscriptPostProcessor {
-    suspend fun protocol(t: Transcript): MeetingProtocol
+    /** Итоги разговора свободным текстом (форму выбирает модель: встреча, интервью, игра…). */
+    suspend fun protocol(t: Transcript): String
     suspend fun correct(t: Transcript): Transcript
 }
 
 interface TranscriptionPipeline {
+    /** Расшифровка: декодирование → … → склейка реплик. LLM здесь нет. */
     fun run(uri: String, config: PipelineConfig): Flow<PipelineEvent>
+
+    /**
+     * LLM-анализ готовой расшифровки (итоги, имена/роли, правка) — отдельный этап после показа результата.
+     * null — анализ не нужен (выключен или расшифровка пустая). Сбой LLM не бросается: итоги объясняют причину.
+     */
+    suspend fun analyze(transcript: Transcript, config: PipelineConfig): Analysis? = null
 }
+
+fun PipelineConfig.wantsAnalysis(t: Transcript) =
+    t.transcript.isNotEmpty() && (enableLlmProtocol || enableLlmCorrection)
 
 // Фабрики: каждый движок создаётся лениво и закрывается сразу после своего этапа,
 // модели загружаются по очереди (диаризация → ASR → LLM), иначе телефон упадёт по памяти.

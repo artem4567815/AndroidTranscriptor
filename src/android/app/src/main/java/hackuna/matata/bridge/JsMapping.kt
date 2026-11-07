@@ -25,13 +25,15 @@ internal object JsMapping {
     }
 
     /** Расшифровка уходит во Vue тем же строгим JSON, что и в экспорт. */
-    fun result(r: StoredResult) = JSObject().apply {
+    /** [analysisPending] — LLM-анализ ещё идёт: итоги и имена спикеров придут позже (событие `analysis`). */
+    fun result(r: StoredResult, analysisPending: Boolean = false) = JSObject().apply {
         put("recordingId", r.recordingId)
         put("transcript", JSObject(TranscriptJson.encode(r.transcript, pretty = false)))
         r.llmCorrected?.let { put("llmCorrected", JSObject(TranscriptJson.encode(it, pretty = false))) }
         r.protocol?.let { put("protocol", it) }
         put("speakerNames", JSObject().apply { r.speakerNames.forEach { (k, v) -> put(k, v) } })
         put("rtf", r.rtf)
+        put("analysisPending", analysisPending)
     }
 
     fun models(items: List<ModelStatus>) = JSObject().apply {

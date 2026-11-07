@@ -27,6 +27,8 @@ export const STAGES: readonly Stage[] = [
   'LLM',
   'SAVE',
 ]
+/** Этапы расшифровки на экране обработки. LLM-анализ идёт отдельно — уже после показа результата. */
+export const PROCESSING_STAGES: readonly Stage[] = STAGES.filter((s) => s !== 'LLM')
 export type RecordingStatus = 'NEW' | 'PROCESSING' | 'DONE' | 'ERROR'
 export type ExportFormat = 'json' | 'txt' | 'srt'
 
@@ -90,6 +92,8 @@ export interface TranscriptResult {
   protocol?: string
   speakerNames: Record<string, string>
   rtf: number
+  /** LLM-анализ ещё идёт: итоги и имена спикеров придут позже (событие `analysis`). */
+  analysisPending?: boolean
 }
 /** Сведения о модели для SettingsPage (расширение контракта). */
 export interface ModelInfo {
@@ -108,6 +112,11 @@ export interface ProgressEvent {
 }
 export interface CompletedEvent {
   id: string
+}
+/** LLM-анализ расшифровки после её показа: running — идёт, false — закончился (итоги можно перечитать). */
+export interface AnalysisEvent {
+  id: string
+  running: boolean
 }
 export interface FailedEvent {
   id: string
@@ -137,7 +146,10 @@ export interface StenoPlugin {
   startRecording(): Promise<void>
   stopRecording(): Promise<Recording>
   deleteRecording(o: { id: string }): Promise<void>
-  /** Резолвится сразу после старта; итог — событие `completed` или `failed`. */
+  /**
+   * Резолвится сразу после старта; итог — событие `completed` или `failed`. После `completed`, если включены
+   * итоги/правка LLM, идёт анализ: события `analysis` (running: true → false).
+   */
   process(o: { id: string; options: PipelineOptions }): Promise<void>
   cancel(): Promise<void>
   getResult(o: { id: string }): Promise<TranscriptResult>
@@ -154,6 +166,7 @@ export interface StenoPlugin {
   addListener(e: 'progress', cb: (e: ProgressEvent) => void): Promise<PluginListenerHandle>
   addListener(e: 'completed', cb: (e: CompletedEvent) => void): Promise<PluginListenerHandle>
   addListener(e: 'failed', cb: (e: FailedEvent) => void): Promise<PluginListenerHandle>
+  addListener(e: 'analysis', cb: (e: AnalysisEvent) => void): Promise<PluginListenerHandle>
   addListener(
     e: 'recordingLevel',
     cb: (e: RecordingLevelEvent) => void,
