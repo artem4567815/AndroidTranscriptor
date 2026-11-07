@@ -88,9 +88,10 @@ class DefaultTranscriptionPipelineTest {
     private fun pipeline(
         asrFactory: SpeechRecognizerFactory = asr,
         llmFactory: LlmEngineFactory = llm,
+        vadFactory: VadFactory = vad,
     ): DefaultTranscriptionPipeline {
         var t = 0L
-        return DefaultTranscriptionPipeline(decoder, pre, vad, diar, asrFactory, llmFactory, pp, nowMs = { t += 10; t }, log = {})
+        return DefaultTranscriptionPipeline(decoder, pre, vadFactory, diar, asrFactory, llmFactory, pp, nowMs = { t += 10; t }, log = {})
     }
 
     @Test
@@ -114,6 +115,15 @@ class DefaultTranscriptionPipelineTest {
 
     @Test
     fun `метки ASR учитывают паддинг и ограничиваются сегментом`() = runTest {
+        // Пауза VAD сохраняет три отдельных фрагмента после повторной разметки спикеров.
+        val separatedVad = VadFactory {
+            object : VoiceActivityDetector {
+                override fun detect(audio: PcmAudio) = listOf(
+                    SpeechRegion(0, 2000), SpeechRegion(2300, 4000), SpeechRegion(5000, 9000),
+                )
+                override fun close() { closed += "vad" }
+            }
+        }
         var index = 0
         val timedAsr = SpeechRecognizerFactory {
             object : SpeechRecognizer {
@@ -132,8 +142,9 @@ class DefaultTranscriptionPipelineTest {
                 override fun close() {}
             }
         }
-        val result = pipeline(asrFactory = timedAsr)
-            .run("x", PipelineConfig(mergeGapMs = 0)).toList().last() as PipelineEvent.Completed
+        val result = pipeline(asrFactory = timedAsr, vadFactory = separatedVad)
+            .run("x", PipelineConfig(mergeGapMs = 0, segmentPaddingMs = 150)).toList().last() as PipelineEvent.Completed
+        assertEquals(3, index)
         assertEquals(
             listOf(300L to 2000L, 2300L to 4000L, 5200L to 6050L),
             result.result.transcript.transcript.map { it.startMs to it.endMs },
