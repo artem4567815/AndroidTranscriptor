@@ -15,12 +15,14 @@ export const useModelsStore = defineStore('models', () => {
     if (ready.value) return true
     preparing.value = true
     error.value = null
-    const steno = await getSteno()
-    const handle = await steno.addListener('modelsProgress', (e) => {
-      fraction.value = e.fraction
-      file.value = e.file
-    })
+    let handle: { remove: () => Promise<void> } | null = null
+    // Всё внутри try: любая ошибка моста должна показаться на экране, а не повесить его.
     try {
+      const steno = await getSteno()
+      handle = await steno.addListener('modelsProgress', (e) => {
+        fraction.value = e.fraction
+        file.value = e.file
+      })
       ready.value = (await steno.prepareModels()).ready
       return ready.value
     } catch (e) {
@@ -28,7 +30,7 @@ export const useModelsStore = defineStore('models', () => {
       return false
     } finally {
       preparing.value = false
-      await handle.remove()
+      await handle?.remove()
     }
   }
 

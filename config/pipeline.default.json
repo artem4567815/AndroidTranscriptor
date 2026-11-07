@@ -9,5 +9,6 @@
   "enableDenoise": false,
   "enableLlmProtocol": true,
   "enableLlmCorrection": false,
-  "vadThreshold": 0.5
+  "vadThreshold": 0.5,
+  "diarizationWindowShift": 0.1
 }

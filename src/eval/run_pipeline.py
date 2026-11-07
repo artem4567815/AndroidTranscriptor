@@ -15,7 +15,8 @@ import sys
 import time
 from pathlib import Path
 
-from common import SpeakerText, load_config, merge_utterances, plan_segments, save_transcript
+from common import (SpeakerText, load_config, merge_utterances, plan_segments, preprocess, resolve_overlaps,
+                    save_transcript)
 
 SR = 16_000
 
@@ -30,6 +31,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--num-speakers", type=int, default=None, help="переопределить numSpeakers (0 = авто)")
     p.add_argument("--cluster-threshold", type=float, default=None, help="переопределить clusterThreshold")
     p.add_argument("--threads", type=int, default=None, help="переопределить numThreads")
+    p.add_argument("--window-shift", type=float, default=None,
+                   help="переопределить diarizationWindowShift (шаг окна сегментации, доля 10-секундного окна)")
+    p.add_argument("--diarization-only", action="store_true",
+                   help="только VAD + диаризация (без ASR): <имя>.json с пустым текстом — для eval_der.py "
+                        "и подбора порогов диаризации; быстро и не зависит от языка записи")
+    p.add_argument("--embedding", default=None,
+                   help="другая модель отпечатков голоса (.onnx) для сравнения по DER; "
+                        "по умолчанию <models>/diarization/embedding.onnx")
     return p.parse_args()
 
 
@@ -64,6 +73,8 @@ def main() -> int:
         cfg["clusterThreshold"] = args.cluster_threshold
     if args.threads is not None:
         cfg["numThreads"] = args.threads
+    if args.window_shift is not None:
+        cfg["diarizationWindowShift"] = args.window_shift
     m = Path(args.models)
     out_dir = Path(args.out)
 
@@ -77,11 +88,12 @@ def main() -> int:
     diar_cfg = sherpa_onnx.OfflineSpeakerDiarizationConfig(
         segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
             pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
-                model=str(m / "diarization/segmentation.onnx")),
+                model=str(m / "diarization/segmentation.onnx"),
+                window_shift_ratio=cfg.get("diarizationWindowShift", 0.1)),
             num_threads=cfg["numThreads"],
         ),
         embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
-            model=str(m / "diarization/embedding.onnx"), num_threads=cfg["numThreads"]),
+            model=args.embedding or str(m / "diarization/embedding.onnx"), num_threads=cfg["numThreads"]),
         clustering=sherpa_onnx.FastClusteringConfig(
             num_clusters=cfg["numSpeakers"] if cfg["numSpeakers"] > 0 else -1,
             threshold=cfg["clusterThreshold"]),
@@ -98,6 +110,10 @@ def main() -> int:
         samples = load_audio(audio_path)
         tick("DECODE", t0)
         duration_ms = int(len(samples) * 1000 / SR)
+
+        t0 = time.perf_counter()
+        samples = preprocess(samples)  # как DefaultAudioPreprocessor в приложении
+        tick("PREPROCESS", t0)
 
         t0 = time.perf_counter()
         vad = sherpa_onnx.VoiceActivityDetector(vad_cfg, buffer_size_in_seconds=max(60, duration_ms // 1000 + 10))
@@ -124,6 +140,23 @@ def main() -> int:
         if not diar:
             diar = [(0, a, b) for a, b in speech]
         tick("DIARIZATION", t0)
+
+        if args.diarization_only:
+            ids: dict[int, str] = {}
+            items = []
+            for spk, a, b in resolve_overlaps(diar):
+                sid = ids.setdefault(spk, f"speaker_{len(ids) + 1}")
+                items.append({"speaker_id": sid, "start_ms": a, "end_ms": b, "text": ""})
+            save_transcript(items, out_dir / f"{name}.json")
+            total = sum(timings.values())
+            meta = {"recording_id": name, "audio_duration_ms": duration_ms, "rtf": total / max(1, duration_ms),
+                    "timings_ms": timings, "platform": "pc", "mode": "diarization-only",
+                    "window_shift": cfg.get("diarizationWindowShift")}
+            (out_dir / f"{name}.timings.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                                          encoding="utf-8")
+            print(f"{name}: спикеров={len(ids)} отрезков={len(items)} "
+                  f"диаризация={timings['DIARIZATION']} мс (RTF {timings['DIARIZATION'] / max(1, duration_ms):.3f})")
+            continue
 
         t0 = time.perf_counter()
         rec = sherpa_onnx.OfflineRecognizer.from_transducer(

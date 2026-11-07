@@ -91,3 +91,24 @@ describe('transcript store', () => {
     expect(t.activeIndex).toBe(2)
   })
 })
+
+describe('отмена', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    const mock = createStenoMock()
+    mock.devSetSpeed(1)
+    setStenoForTests(mock)
+  })
+  afterEach(() => setStenoForTests(null))
+
+  it('флаг «отменяю» держится до конца обработки и сбрасывается после', async () => {
+    const p = useProcessingStore()
+    await p.start('2', options)
+    await p.cancel()
+    expect(p.cancelRequested).toBe(true)
+    await p.cancel() // повторное нажатие ничего не ломает
+    await waitFor(() => !p.running)
+    expect(p.cancelRequested).toBe(false)
+    expect(p.failure?.code).toBe('CANCELLED')
+  })
+})

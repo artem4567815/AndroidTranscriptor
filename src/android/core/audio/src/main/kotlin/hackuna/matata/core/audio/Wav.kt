@@ -9,10 +9,6 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-/**
- * Потоковая запись WAV PCM 16 бит. Заголовок дописывается при [close],
- * поэтому писать можно сколько угодно долго без хранения аудио в памяти.
- */
 class WavWriter(
     val file: File,
     val sampleRate: Int = PcmAudio.MODEL_SAMPLE_RATE,
@@ -57,7 +53,7 @@ class WavWriter(
             bb.put("WAVE".toByteArray(Charsets.US_ASCII))
             bb.put("fmt ".toByteArray(Charsets.US_ASCII))
             bb.putInt(16)
-            bb.putShort(1) // PCM
+            bb.putShort(1)
             bb.putShort(channels.toShort())
             bb.putInt(sampleRate)
             bb.putInt(sampleRate * channels * 2)
@@ -76,10 +72,6 @@ class WavWriter(
 
 fun floatToPcm16(v: Float): Short = (v.coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort()
 
-/**
- * Чтение WAV: PCM 8/16/24/32 бит и IEEE float 32, любое число каналов.
- * Результат — моно float с исходной частотой; приведение к 16 кГц — [WavReader.readAs16kMono].
- */
 object WavReader {
     fun read(file: File): PcmAudio = read(file.readBytes())
 

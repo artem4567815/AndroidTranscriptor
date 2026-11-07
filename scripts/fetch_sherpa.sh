@@ -19,7 +19,7 @@ trap 'rm -rf "$TMP"' EXIT
 sha256() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || sha256sum "$1" | cut -d' ' -f1; }
 
 echo "==> sherpa-onnx v$VERSION: нативные библиотеки"
-curl -fL --retry 3 -o "$TMP/$ARCHIVE" "$BASE/releases/download/v$VERSION/$ARCHIVE"
+curl -fL --retry 5 --retry-all-errors --retry-delay 2 -o "$TMP/$ARCHIVE" "$BASE/releases/download/v$VERSION/$ARCHIVE"
 ACTUAL="$(sha256 "$TMP/$ARCHIVE")"
 if [[ "$ACTUAL" != "$ARCHIVE_SHA256" ]]; then
   echo "Ошибка: sha256 не совпадает ($ACTUAL)" >&2
@@ -48,9 +48,12 @@ FILES=(
 )
 mkdir -p "$KT_DIR"
 for f in "${FILES[@]}"; do
-  curl -fsSL --retry 3 -o "$KT_DIR/$f" "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v$VERSION/sherpa-onnx/kotlin-api/$f"
+  # Качаем во временный файл: при обрыве сети старая рабочая копия не портится.
+  curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o "$TMP/$f" \
+    "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v$VERSION/sherpa-onnx/kotlin-api/$f"
+  mv "$TMP/$f" "$KT_DIR/$f"
   echo "   $f"
 done
-curl -fsSL -o "$MODULE/LICENSE-sherpa-onnx" "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v$VERSION/LICENSE"
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o "$MODULE/LICENSE-sherpa-onnx" "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v$VERSION/LICENSE"
 echo "$VERSION" > "$MODULE/SHERPA_VERSION"
 echo "Готово."

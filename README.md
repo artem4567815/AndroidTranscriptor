@@ -41,6 +41,7 @@ scripts/build_release.sh
 | [docs/MODELS.md](docs/MODELS.md) | модели: назначение, версия, размер, лицензия |
 | [docs/WEB_DEV.md](docs/WEB_DEV.md) | для Vue-разработчика: три режима запуска, мок, отладка |
 | [docs/TEAM.md](docs/TEAM.md) | роли, задачи, таймлайн |
+| [docs/ROLE3.md](docs/ROLE3.md) | диаризация, пайплайн и мост: состояние, вводная, грабли |
 | [docs/TESTS.md](docs/TESTS.md) | метрики WER / DER / RTF, собственные тесты |
 | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | требования к телефону, известные ограничения |
 | [docs/BACKLOG.md](docs/BACKLOG.md) | идеи и улучшения |
