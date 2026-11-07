@@ -13,12 +13,14 @@ async function prepare(): Promise<boolean> {
   if (ready.value) return true
   preparing.value = true
   error.value = null
-  const steno = await getSteno()
-  const handle = await steno.addListener('modelsProgress', (e) => {
-    fraction.value = e.fraction
-    file.value = e.file
-  })
+  let handle: { remove: () => Promise<void> } | null = null
+  // Всё внутри try: любая ошибка моста должна показаться на экране, а не повесить его.
   try {
+    const steno = await getSteno()
+    handle = await steno.addListener('modelsProgress', (e) => {
+      fraction.value = e.fraction
+      file.value = e.file
+    })
     ready.value = (await steno.prepareModels()).ready
     return ready.value
   } catch (e) {
@@ -26,31 +28,9 @@ async function prepare(): Promise<boolean> {
     return false
   } finally {
     preparing.value = false
-    await handle.remove()
+    await handle?.remove()
   }
 }
-  async function prepare(): Promise<boolean> {
-    if (ready.value) return true
-    preparing.value = true
-    error.value = null
-    let handle: { remove: () => Promise<void> } | null = null
-    // Всё внутри try: любая ошибка моста должна показаться на экране, а не повесить его.
-    try {
-      const steno = await getSteno()
-      handle = await steno.addListener('modelsProgress', (e) => {
-        fraction.value = e.fraction
-        file.value = e.file
-      })
-      ready.value = (await steno.prepareModels()).ready
-      return ready.value
-    } catch (e) {
-      error.value = errorMessage(e)
-      return false
-    } finally {
-      preparing.value = false
-      await handle?.remove()
-    }
-  }
 
 export function useModelsStore() {
   return { ready, preparing, fraction, file, error, prepare }
