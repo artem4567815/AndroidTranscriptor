@@ -9,6 +9,7 @@ import { ru } from '@/i18n/ru'
 import ToastMessage from '@/components/ToastMessage.vue'
 import DownloadDialog from '@/components/DownloadDialog.vue'
 import RecordingDetailsDialog from '@/components/RecordingDetailsDialog.vue'
+import EditTextDialog from '@/components/EditTextDialog.vue'
 
 const props = defineProps<{ id: string }>()
 const store = useTranscriptStore()
@@ -21,9 +22,12 @@ const toastOpen = ref(false)
 const downloadOpen = ref(false)
 const isPlaying = ref(false)
 const detailsOpen = ref(false)
+const editTextIndex = ref<number | null>(null)
+const hasProtocol = computed(() => Boolean(store.result.value?.protocol?.trim()))
 onMounted(async () => {
   if (!recordings.items.value.length) await recordings.refresh()
   await store.load(props.id)
+  tab.value = 'transcript'
 })
 watch([store.activeIndex, isPlaying], ([index, playing]) => {
   if (!playing || index < 0) return
@@ -35,8 +39,16 @@ function seek(ms: number) {
   seekToMs.value = ms + Math.random() * 0.001
 }
 async function editText(index: number) {
-  const text = window.prompt(ru.transcript.editText, store.utterances.value[index].text)
-  if (text !== null) await store.updateText(index, text.trim())
+  editTextIndex.value = index
+}
+async function saveEditedText(text: string, speakerId: string) {
+  if (editTextIndex.value === null) return
+  const index = editTextIndex.value
+  await store.updateText(index, text)
+  if (store.utterances.value[index]?.speaker_id !== speakerId) {
+    await store.changeSpeaker(index, speakerId)
+  }
+  editTextIndex.value = null
 }
 async function exportAs(format: ExportFormat) {
   if (await store.exportAs(format)) {
@@ -111,7 +123,7 @@ async function saveDetails(title: string, names: Record<string, string>) {
       ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
-      <div class="tabs">
+      <div v-if="hasProtocol" class="tabs">
         <button :class="{ active: tab === 'transcript' }" @click="tab = 'transcript'">
           {{ ru.transcript.tabTranscript }}</button
         ><button :class="{ active: tab === 'protocol' }" @click="tab = 'protocol'">
@@ -121,7 +133,7 @@ async function saveDetails(title: string, names: Record<string, string>) {
       <p v-if="store.loading.value" class="loading">Загружаем расшифровку…</p>
       <p v-else-if="store.error.value" class="inline-error">{{ store.error.value }}</p>
       <template v-else-if="store.result.value">
-        <div v-if="tab === 'transcript'" class="utterances">
+        <div v-if="tab === 'transcript' || !hasProtocol" class="utterances">
           <div class="transcript-meta">
             <span class="result-pill"
               ><b>{{ store.utterances.value.length }}</b> реплик <em>·</em> RTF
@@ -131,6 +143,10 @@ async function saveDetails(title: string, names: Record<string, string>) {
               <span>LLM-версия</span></label
             >
           </div>
+          <p class="edit-hint">
+            <span aria-hidden="true">✦</span>
+            Удерживайте реплику, чтобы изменить текст или выбрать другого спикера
+          </p>
           <UtteranceCard
             v-for="(u, index) in store.utterances.value"
             :key="`${index}-${u.start_ms}`"
@@ -144,8 +160,7 @@ async function saveDetails(title: string, names: Record<string, string>) {
           />
         </div>
         <article v-else class="protocol surface">
-          <pre v-if="store.result.value.protocol">{{ store.result.value.protocol }}</pre>
-          <p v-else class="muted">{{ ru.transcript.noProtocol }}</p>
+          <pre>{{ store.result.value.protocol }}</pre>
         </article>
       </template>
     </main>
@@ -176,6 +191,17 @@ async function saveDetails(title: string, names: Record<string, string>) {
       @save="saveDetails"
       @cancel="detailsOpen = false"
     />
+    <EditTextDialog
+      :open="editTextIndex !== null"
+      :initial-text="editTextIndex === null ? '' : store.utterances.value[editTextIndex].text"
+      :initial-speaker-id="
+        editTextIndex === null ? '' : store.utterances.value[editTextIndex].speaker_id
+      "
+      :speaker-ids="store.speakerIds.value"
+      :speaker-names="store.speakerNames.value"
+      @save="saveEditedText"
+      @cancel="editTextIndex = null"
+    />
   </div>
 </template>
 
@@ -192,6 +218,26 @@ async function saveDetails(title: string, names: Record<string, string>) {
   border: 1px solid var(--app-border);
   border-radius: 15px;
   background: var(--app-surface);
+}
+.edit-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 11px 3px 14px;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.edit-hint span {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 7px;
+  color: var(--app-primary);
+  background: color-mix(in srgb, var(--app-primary) 13%, transparent);
+  font-size: 12px;
 }
 .title-button {
   display: inline-flex;

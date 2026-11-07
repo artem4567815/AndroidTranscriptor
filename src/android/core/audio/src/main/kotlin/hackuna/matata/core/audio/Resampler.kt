@@ -63,5 +63,5 @@ class FloatBuffer(initialCapacity: Int = 1 shl 16) {
         data[size++] = v
     }
 
-    fun toArray(): FloatArray = data.copyOf(size)
+    fun toArray(): FloatArray = if (size == data.size) data else data.copyOf(size)
 }
