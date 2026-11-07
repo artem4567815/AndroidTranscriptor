@@ -91,6 +91,9 @@ class TranscriptionController(
                         _events.emit(Event.Progress(id, e.stage, e.fraction))
                     }
                     is PipelineEvent.StageDone -> Unit
+                    // Черновик без LLM: переживёт убийство процесса во время LLM (статус остаётся PROCESSING,
+                    // а resetStaleProcessing при следующем запуске переведёт запись с результатом в DONE).
+                    is PipelineEvent.TranscriptReady -> repo.saveResult(id, e.result, final = false)
                     is PipelineEvent.Failed -> {
                         stage = e.stage
                         throw e.error

@@ -25,8 +25,8 @@ dependencies {
     api(project(":core:model"))
     implementation(project(":ml:runtime"))
     implementation(libs.koin.android)
-    // TODO(роль 4): implementation(libs.litertlm.android) — подключить вместе с LiteRtLmEngine.
+    // Локальная LLM: LiteRT-LM Kotlin API (+~23 МБ нативной библиотеки arm64)
+    implementation(libs.litertlm.android)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
-    implementation(libs.litertlm.android)
 }
