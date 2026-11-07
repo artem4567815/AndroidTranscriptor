@@ -96,8 +96,16 @@ async function saveDetails(title: string, names: Record<string, string>) {
   <div class="page transcript-page">
     <header class="topbar compact">
       <RouterLink class="back-button" to="/library">‹</RouterLink
-      ><button class="topbar-title title-button" @click="detailsOpen = true">
-        {{ recording?.title ?? ru.transcript.title }}</button
+      ><button
+        class="topbar-title title-button"
+        aria-label="Редактировать название и участников"
+        @click="detailsOpen = true"
+      >
+        <span>{{ recording?.title ?? ru.transcript.title }}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="m4 20 4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" />
+          <path d="m13.8 7.2 3 3" />
+        </svg></button
       ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
@@ -184,6 +192,10 @@ async function saveDetails(title: string, names: Record<string, string>) {
   background: var(--app-surface);
 }
 .title-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: min(70%, 360px);
   overflow: hidden;
   padding: 0 8px;
@@ -194,6 +206,25 @@ async function saveDetails(title: string, names: Record<string, string>) {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.title-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.title-button svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--app-primary);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+.title-button:active {
+  opacity: 0.7;
+  transform: scale(0.98);
 }
 .tabs button {
   padding: 11px;

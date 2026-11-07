@@ -38,6 +38,7 @@ function save() {
         <section class="details-dialog" role="dialog" aria-modal="true" aria-label="Данные записи">
           <div class="details-mark">✦</div>
           <h2>О записи</h2>
+          <p class="details-hint">Название и имена участников можно изменить здесь.</p>
           <label class="details-field">
             <span>Название</span>
             <input v-model="draftTitle" maxlength="80" placeholder="Например, Планёрка команды" />
@@ -97,9 +98,15 @@ function save() {
   background: linear-gradient(145deg, var(--app-primary-soft), var(--app-primary));
 }
 .details-dialog h2 {
-  margin: 0 0 20px;
+  margin: 0;
   color: var(--app-ink);
   font-size: 22px;
+}
+.details-hint {
+  margin: 7px 0 20px;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 .details-field,
 .participant {
