@@ -1,158 +1,288 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import {
-  IonBackButton,
-  IonButton,
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonListHeader,
-  IonNote,
-  IonPage,
-  IonRange,
-  IonSelect,
-  IonSelectOption,
-  IonText,
-  IonTitle,
-  IonToolbar,
-} from '@ionic/vue'
-import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '@/stores/settings'
 import type { StenoErrorCode } from '@/native'
 import { ru } from '@/i18n/ru'
 import { formatBytes } from '@/utils/time'
 
 const settings = useSettingsStore()
-const { numThreads, clusterThreshold, vadThreshold, models, modelsError } = storeToRefs(settings)
 const failCode = ref<StenoErrorCode | 'none'>('none')
 const speed = ref(1)
 const failCodes = Object.keys(ru.errors) as StenoErrorCode[]
-const version = __APP_VERSION__
-
 onMounted(() => void settings.loadModels())
-
-function onFailCode(v: StenoErrorCode | 'none') {
-  failCode.value = v
-  void settings.devFailNext(v === 'none' ? null : v)
+function onFailCode(code: StenoErrorCode | 'none') {
+  failCode.value = code
+  void settings.devFailNext(code === 'none' ? null : code)
 }
-function onSpeed(v: number) {
-  speed.value = v
-  void settings.devSetSpeed(v)
+function setSpeed(value: number) {
+  speed.value = value
+  settings.devSetSpeed(value)
 }
 </script>
 
 <template>
-  <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-back-button default-href="/library" :text="ru.common.back" />
-        </ion-buttons>
-        <ion-title>{{ ru.settings.title }}</ion-title>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content>
-      <div class="center-block">
-        <ion-list inset>
-          <ion-item>
-            <ion-range
-              v-model="numThreads"
-              :min="1"
-              :max="8"
-              :step="1"
-              :snaps="true"
-              :pin="true"
-              :label="`${ru.settings.threads}: ${numThreads}`"
-              label-placement="stacked"
-            />
-          </ion-item>
-          <ion-item>
-            <ion-range
-              v-model="clusterThreshold"
-              :min="0.1"
-              :max="1"
-              :step="0.05"
-              :pin="true"
-              :label="`${ru.settings.clusterThreshold}: ${clusterThreshold.toFixed(2)}`"
-              label-placement="stacked"
-            />
-          </ion-item>
-          <ion-item>
-            <ion-range
-              v-model="vadThreshold"
-              :min="0.1"
-              :max="0.9"
-              :step="0.05"
-              :pin="true"
-              :label="`${ru.settings.vadThreshold}: ${vadThreshold.toFixed(2)}`"
-              label-placement="stacked"
-            />
-          </ion-item>
-          <ion-item button @click="settings.resetDefaults()">
-            <ion-label color="primary">Сбросить по умолчанию</ion-label>
-          </ion-item>
-        </ion-list>
-
-        <ion-list inset>
-          <ion-list-header>{{ ru.settings.models }}</ion-list-header>
-          <ion-text v-if="modelsError" color="danger"
-            ><p class="ion-padding-horizontal">{{ modelsError }}</p></ion-text
+  <div class="page">
+    <header class="topbar compact">
+      <RouterLink class="back-button" to="/library">‹</RouterLink
+      ><span class="topbar-title">{{ ru.settings.title }}</span
+      ><span class="topbar-spacer" />
+    </header>
+    <main class="screen settings-screen">
+      <section class="settings-hero">
+        <p class="eyebrow">Ваше пространство</p>
+        <h1>Настройки</h1>
+        <p class="muted">Настройте приложение под свой ритм работы.</p>
+      </section>
+      <section class="settings-card surface">
+        <h2>{{ ru.settings.appearance }}</h2>
+        <div class="theme-heading">
+          <span
+            ><b>{{ ru.settings.theme }}</b
+            ><small>Спокойная палитра для долгой работы</small></span
           >
-          <ion-item v-for="m in models" :key="m.id">
-            <ion-label>
-              <h3>{{ m.purpose }}</h3>
-              <p>{{ m.version }} · {{ formatBytes(m.sizeBytes) }} · {{ m.license }}</p>
-            </ion-label>
-            <ion-note v-if="!m.present" slot="end" color="danger">{{
-              ru.settings.modelMissing
-            }}</ion-note>
-          </ion-item>
-        </ion-list>
-
-        <ion-list inset>
-          <ion-list-header>{{ ru.settings.about }}</ion-list-header>
-          <ion-item>
-            <ion-label class="ion-text-wrap">
-              <h3>{{ ru.appName }} {{ version }}</h3>
-              <p>{{ ru.settings.aboutText }}</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-
-        <ion-list v-if="settings.isMock" inset>
-          <ion-list-header>{{ ru.settings.dev }}</ion-list-header>
-          <ion-item>
-            <ion-select
-              :value="failCode"
-              :label="ru.settings.failNext"
-              label-placement="stacked"
-              interface="popover"
-              @ion-change="onFailCode($event.detail.value)"
-            >
-              <ion-select-option value="none">{{ ru.settings.noFail }}</ion-select-option>
-              <ion-select-option v-for="c in failCodes" :key="c" :value="c">{{
-                c
-              }}</ion-select-option>
-            </ion-select>
-          </ion-item>
-          <ion-item>
-            <ion-label>{{ ru.settings.speed }}</ion-label>
-            <ion-button
-              v-for="x in [1, 3, 10]"
-              :key="x"
-              slot="end"
-              size="small"
-              :fill="speed === x ? 'solid' : 'outline'"
-              @click="onSpeed(x)"
-            >
-              ×{{ x }}
-            </ion-button>
-          </ion-item>
-        </ion-list>
-      </div>
-    </ion-content>
-  </ion-page>
+        </div>
+        <div class="theme-options">
+          <button
+            v-for="option in [
+              { value: 'light', label: ru.settings.lightTheme, icon: '☼' },
+              { value: 'dark', label: ru.settings.darkTheme, icon: '☾' },
+              { value: 'system', label: ru.settings.systemTheme, icon: '◐' },
+            ]"
+            :key="option.value"
+            class="theme-option"
+            :class="{ selected: settings.theme.value === option.value }"
+            @click="settings.theme.value = option.value as 'light' | 'dark' | 'system'"
+          >
+            <span class="theme-preview" :class="`preview-${option.value}`"><i /></span
+            ><span class="theme-option-label">{{ option.icon }} {{ option.label }}</span
+            ><span v-if="settings.theme.value === option.value" class="theme-check">✓</span>
+          </button>
+        </div>
+      </section>
+      <section class="settings-card surface">
+        <h2>Обработка</h2>
+        <label class="setting-row"
+          ><span
+            ><b>{{ ru.settings.threads }}</b
+            ><small>Параллельные вычисления</small></span
+          ><input
+            v-model.number="settings.numThreads.value"
+            class="range-control"
+            type="range"
+            min="1"
+            max="8"
+        /></label>
+        <label class="setting-row"
+          ><span
+            ><b>{{ ru.settings.clusterThreshold }}</b
+            ><small>{{ settings.clusterThreshold.value.toFixed(2) }}</small></span
+          ><input
+            v-model.number="settings.clusterThreshold.value"
+            class="range-control"
+            type="range"
+            min=".1"
+            max="1"
+            step=".05"
+        /></label>
+        <button class="text-button" @click="settings.resetDefaults">Сбросить настройки</button>
+      </section>
+      <section class="settings-card surface">
+        <h2>{{ ru.settings.models }}</h2>
+        <p v-if="settings.modelsError.value" class="inline-error">
+          {{ settings.modelsError.value }}
+        </p>
+        <div v-for="model in settings.models.value" :key="model.id" class="model-row">
+          <span
+            ><b>{{ model.purpose }}</b
+            ><small>{{ model.version }} · {{ formatBytes(model.sizeBytes) }}</small></span
+          ><i :class="{ missing: !model.present }">{{ model.present ? 'Готово' : 'Нет' }}</i>
+        </div>
+      </section>
+      <section v-if="settings.isMock" class="settings-card surface">
+        <h2>{{ ru.settings.dev }}</h2>
+        <select v-model="failCode" class="dev-select" @change="onFailCode(failCode)">
+          <option value="none">{{ ru.settings.noFail }}</option>
+          <option v-for="code in failCodes" :key="code" :value="code">{{ code }}</option>
+        </select>
+        <div class="speed-row">
+          <button
+            v-for="x in [1, 3, 10]"
+            :key="x"
+            class="speed-button"
+            :class="{ selected: speed === x }"
+            @click="setSpeed(x)"
+          >
+            ×{{ x }}
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
 </template>
+
+<style scoped>
+.settings-screen {
+  padding-top: 20px;
+}
+.settings-hero h1 {
+  margin: 0;
+  font-size: 34px;
+  letter-spacing: -0.07em;
+}
+.settings-hero p:last-child {
+  margin-top: 10px;
+}
+.settings-card {
+  margin: 18px 0;
+  padding: 18px;
+}
+.settings-card h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--app-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.setting-row,
+.model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--app-border);
+}
+.setting-row span,
+.model-row span,
+.theme-heading span {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.setting-row small,
+.model-row small,
+.theme-heading small {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.theme-heading {
+  padding: 8px 0 14px;
+}
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.theme-option {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 15px;
+  color: var(--app-ink);
+  background: transparent;
+  text-align: left;
+}
+.theme-option.selected {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-primary) 18%, transparent);
+}
+.theme-preview {
+  display: block;
+  height: 48px;
+  padding: 7px;
+  border-radius: 10px;
+  background: #f5f3ff;
+}
+.theme-preview i {
+  display: block;
+  width: 65%;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 5px;
+  background: #d7d1ff;
+  box-shadow: 0 14px 0 #fff;
+}
+.preview-dark {
+  background: #242338;
+}
+.preview-dark i {
+  background: #6e65eb;
+  box-shadow: 0 14px 0 #3b3954;
+}
+.preview-system {
+  background: linear-gradient(110deg, #f5f3ff 50%, #242338 50%);
+}
+.preview-system i {
+  background: #6e65eb;
+  box-shadow: 0 14px 0 rgba(255, 255, 255, 0.7);
+}
+.theme-option-label {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.theme-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--app-primary);
+  font-size: 12px;
+}
+.range-control {
+  width: 120px;
+  accent-color: var(--app-primary);
+}
+.text-button {
+  padding: 12px 0 0;
+  border: 0;
+  color: var(--app-primary);
+  background: transparent;
+  font: inherit;
+  font-weight: 750;
+}
+.model-row i {
+  color: #17a86b;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+.model-row i.missing {
+  color: #ce4c5c;
+}
+.dev-select {
+  width: 100%;
+  max-width: none;
+  padding: 12px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+}
+.speed-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.speed-button {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  color: var(--app-ink);
+  background: transparent;
+  font: inherit;
+}
+.speed-button.selected {
+  color: #fff;
+  border-color: var(--app-primary);
+  background: var(--app-primary);
+}
+</style>

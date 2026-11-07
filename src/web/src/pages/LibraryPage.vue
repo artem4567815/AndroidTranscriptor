@@ -1,38 +1,16 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import {
-  alertController,
-  IonBadge,
-  IonButton,
-  IonButtons,
-  IonContent,
-  IonFooter,
-  IonHeader,
-  IonIcon,
-  IonItem,
-  IonItemOption,
-  IonItemOptions,
-  IonItemSliding,
-  IonLabel,
-  IonList,
-  IonPage,
-  IonRefresher,
-  IonRefresherContent,
-  IonText,
-  IonTitle,
-  IonToolbar,
-  onIonViewWillEnter,
-} from '@ionic/vue'
-import { cloudUploadOutline, micOutline, settingsOutline, trashOutline } from 'ionicons/icons'
-import { storeToRefs } from 'pinia'
+import { onMounted, ref } from 'vue'
 import { useRecordingsStore } from '@/stores/recordings'
 import type { Recording, RecordingStatus } from '@/native'
 import { ru } from '@/i18n/ru'
 import { formatMs } from '@/utils/time'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const store = useRecordingsStore()
-const { items, error, loading } = storeToRefs(store)
+const { items, error, loading } = store
 const router = useRouter()
+const pendingDelete = ref<Recording | null>(null)
 
 const statusColor: Record<RecordingStatus, string> = {
   NEW: 'medium',
@@ -41,7 +19,7 @@ const statusColor: Record<RecordingStatus, string> = {
   ERROR: 'danger',
 }
 
-onIonViewWillEnter(() => void store.refresh())
+onMounted(() => void store.refresh())
 
 function open(r: Recording) {
   void router.push(r.status === 'DONE' ? `/transcript/${r.id}` : `/processing/${r.id}`)
@@ -52,85 +30,353 @@ async function importFile() {
   if (rec) void router.push(`/processing/${rec.id}`)
 }
 
-async function confirmDelete(r: Recording) {
-  const alert = await alertController.create({
-    header: r.title,
-    message: ru.library.deleteConfirm,
-    buttons: [
-      { text: ru.common.cancel, role: 'cancel' },
-      { text: ru.common.delete, role: 'destructive', handler: () => void store.remove(r.id) },
-    ],
-  })
-  await alert.present()
+function confirmDelete(r: Recording) {
+  pendingDelete.value = r
 }
-
-async function onRefresh(ev: CustomEvent) {
-  await store.refresh()
-  ;(ev.target as HTMLIonRefresherElement).complete()
+async function removePending() {
+  if (pendingDelete.value) await store.remove(pendingDelete.value.id)
+  pendingDelete.value = null
 }
 </script>
 
 <template>
-  <ion-page>
-    <ion-header>
-      <ion-toolbar>
-        <ion-title>{{ ru.library.title }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button :aria-label="ru.library.settings" router-link="/settings">
-            <ion-icon slot="icon-only" :icon="settingsOutline" />
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-header>
-    <ion-content>
-      <ion-refresher slot="fixed" @ion-refresh="onRefresh">
-        <ion-refresher-content />
-      </ion-refresher>
-      <ion-text v-if="error" color="danger" class="ion-padding"
-        ><p class="ion-padding-horizontal">{{ error }}</p></ion-text
-      >
-      <p v-if="!loading && items.length === 0" class="ion-padding muted">{{ ru.library.empty }}</p>
-      <ion-list>
-        <ion-item-sliding v-for="r in items" :key="r.id">
-          <ion-item button :detail="true" @click="open(r)">
-            <ion-label>
+  <div class="page">
+    <header class="topbar">
+      <div class="topline">
+        <div>
+          <p class="eyebrow">Локальная студия</p>
+          <h1>{{ ru.library.title }}</h1>
+        </div>
+        <div class="header-actions">
+          <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings"
+            >⚙</RouterLink
+          >
+        </div>
+      </div>
+    </header>
+    <main class="screen">
+      <div class="page-content center-block safe-bottom">
+        <section class="welcome-card color-wash fade-up">
+          <div class="welcome-copy">
+            <p class="eyebrow">Ваши мысли, в тексте</p>
+            <h1>Слушайте.<br /><span>Понимайте.</span></h1>
+            <p>Локальная расшифровка разговоров без облака и лишнего шума.</p>
+          </div>
+          <div class="wave-art" aria-hidden="true">
+            <i v-for="n in 9" :key="n" :style="{ '--i': n }" />
+          </div>
+        </section>
+        <p v-if="error" class="error surface">{{ error }}</p>
+        <div v-if="!loading && items.length === 0" class="empty surface fade-up">
+          <div class="empty-icon">◉</div>
+          <h2>Начнём с первой записи</h2>
+          <p class="muted">{{ ru.library.empty }}</p>
+        </div>
+        <div class="recordings-list">
+          <article
+            v-for="(r, index) in items"
+            :key="r.id"
+            class="record surface fade-up"
+            :style="{ '--delay': `${index * 50}ms` }"
+            @click="open(r)"
+          >
+            <div class="record-icon" :class="`record-icon-${r.status.toLowerCase()}`">
+              {{ r.status === 'DONE' ? '◉' : '↥' }}
+            </div>
+            <div class="record-label">
               <h2>{{ r.title }}</h2>
               <p class="mono">
-                {{ formatMs(r.durationMs) }} · {{ new Date(r.createdAt).toLocaleString('ru-RU') }}
+                {{ formatMs(r.durationMs) }} ·
+                {{ new Date(r.createdAt).toLocaleDateString('ru-RU') }}
               </p>
-            </ion-label>
-            <ion-badge slot="end" :color="statusColor[r.status]">{{
+            </div>
+            <span class="badge" :class="`badge-${statusColor[r.status]}`">{{
               ru.status[r.status]
-            }}</ion-badge>
-          </ion-item>
-          <ion-item-options side="end">
-            <ion-item-option color="danger" @click="confirmDelete(r)">
-              <ion-icon slot="icon-only" :icon="trashOutline" :aria-label="ru.common.delete" />
-            </ion-item-option>
-          </ion-item-options>
-        </ion-item-sliding>
-      </ion-list>
-    </ion-content>
-    <ion-footer>
-      <ion-toolbar>
-        <div class="actions">
-          <ion-button expand="block" fill="outline" @click="importFile">
-            <ion-icon slot="start" :icon="cloudUploadOutline" />{{ ru.library.import }}
-          </ion-button>
-          <ion-button expand="block" router-link="/record">
-            <ion-icon slot="start" :icon="micOutline" />{{ ru.library.record }}
-          </ion-button>
+            }}</span>
+            <button
+              class="delete-button"
+              :aria-label="ru.common.delete"
+              @click.stop="confirmDelete(r)"
+            >
+              ×
+            </button>
+          </article>
         </div>
-      </ion-toolbar>
-    </ion-footer>
-  </ion-page>
+      </div>
+    </main>
+    <footer class="bottom-actions">
+      <div class="actions">
+        <button class="action secondary-action" @click="importFile">
+          ↥ <span>{{ ru.library.import }}</span>
+        </button>
+        <RouterLink class="action primary-action" to="/record"
+          >● <span>{{ ru.library.record }}</span></RouterLink
+        >
+      </div>
+    </footer>
+    <ConfirmDialog
+      v-if="pendingDelete"
+      :open="Boolean(pendingDelete)"
+      title="Удалить запись?"
+      :message="`${pendingDelete.title}. ${ru.library.deleteConfirm}`"
+      @cancel="pendingDelete = null"
+      @confirm="removePending"
+    />
+  </div>
 </template>
 
 <style scoped>
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 0 8px;
+  gap: 10px;
+  padding: 8px 16px max(12px, env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--app-bg) 88%, transparent);
+  backdrop-filter: blur(18px);
+}
+.topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.topline h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 850;
+  letter-spacing: -0.05em;
+}
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.status-indicator i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #21b573;
+  box-shadow: 0 0 0 5px rgba(33, 181, 115, 0.14);
+}
+.welcome-card {
+  position: relative;
+  min-height: 208px;
+  margin: 8px 0 30px;
+  padding: 26px 24px;
+  overflow: hidden;
+  border-radius: var(--app-radius-lg);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(231, 225, 255, 0.76)), var(--app-lilac);
+  box-shadow: var(--app-shadow);
+}
+:root[data-theme='dark'] .welcome-card {
+  background:
+    linear-gradient(135deg, rgba(47, 45, 80, 0.96), rgba(56, 38, 57, 0.92)), var(--app-lilac);
+}
+:root[data-theme='dark'] .welcome-copy h1 {
+  color: #fff;
+}
+:root[data-theme='dark'] .welcome-copy p:last-child {
+  color: #d3d0e6;
+}
+.welcome-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 220px;
+}
+.welcome-copy h1 {
+  margin: 0;
+  color: var(--app-ink);
+  font-size: 34px;
+  font-weight: 850;
+  line-height: 0.98;
+  letter-spacing: -0.07em;
+}
+.welcome-copy h1 span {
+  color: var(--app-primary);
+}
+.welcome-copy p:last-child {
+  max-width: 190px;
+  margin: 16px 0 0;
+  color: #777591;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.wave-art {
+  position: absolute;
+  right: 12px;
+  bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 106px;
+  transform: rotate(-12deg);
+}
+.wave-art i {
+  display: block;
+  width: 7px;
+  height: calc(26px + (var(--i) * 8px));
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff917a, #6d63ed);
+  opacity: 0.86;
+}
+.wave-art i:nth-child(odd) {
+  height: calc(75px - (var(--i) * 5px));
+}
+.status-dot {
+  width: 10px;
+  height: 10px;
+  margin-right: 44px;
+  border-radius: 50%;
+  background: #21b573;
+  box-shadow: 0 0 0 5px rgba(33, 181, 115, 0.14);
+}
+.recordings-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+.record {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto 30px;
+  align-items: center;
+  gap: 12px;
+  min-height: 94px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-radius-md);
+  box-shadow: 0 10px 24px rgba(74, 64, 146, 0.07);
+  animation-delay: var(--delay);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.record:active {
+  transform: scale(0.985);
+}
+.record h2 {
+  margin: 0 0 6px;
+  overflow: hidden;
+  color: var(--app-ink);
+  font-size: 15px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.record p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+.record-icon,
+.empty-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  margin-right: 12px;
+  border-radius: 15px;
+  color: #fff;
+  background: linear-gradient(145deg, #7d73f6, #6157e8);
+  font-size: 21px;
+}
+.record-icon {
+  margin-right: 0;
+}
+.record-label {
+  min-width: 0;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.badge-medium {
+  color: #665ed0;
+  background: #e9e6ff;
+}
+.badge-warning {
+  color: #a06a14;
+  background: #fff0c8;
+}
+.badge-success {
+  color: #16835a;
+  background: #d9f5e8;
+}
+.badge-danger {
+  color: #be4d5b;
+  background: #ffe0e4;
+}
+.delete-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--app-muted);
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+}
+.delete-button:active {
+  color: #be4d5b;
+  background: #ffe0e4;
+}
+.record-icon-new {
+  color: #7765df;
+  background: rgba(109, 93, 252, 0.12);
+}
+.record-icon-processing {
+  color: #d79b28;
+  background: rgba(215, 155, 40, 0.14);
+}
+.empty {
+  margin-top: 24px;
+  padding: 28px 22px;
+  text-align: center;
+}
+.empty-icon {
+  margin: 0 auto 16px;
+}
+.empty h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+.empty p {
+  margin: 0;
+  line-height: 1.5;
+}
+.error {
+  margin: 20px 0;
+  padding: 14px 16px;
+  color: #ce4c5c;
+}
+.primary-action {
+  color: #fff;
+  border-color: var(--app-primary);
+  background: linear-gradient(135deg, var(--app-primary-soft), var(--app-primary));
+  box-shadow: 0 8px 18px rgba(97, 87, 232, 0.28);
+}
+.secondary-action {
+  color: var(--app-ink);
+  background: var(--app-surface-solid);
 }
 </style>

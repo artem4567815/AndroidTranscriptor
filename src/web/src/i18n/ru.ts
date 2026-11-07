@@ -82,6 +82,11 @@ export const ru = {
   },
   settings: {
     title: 'Настройки',
+    appearance: 'Внешний вид',
+    theme: 'Тема приложения',
+    lightTheme: 'Светлая',
+    darkTheme: 'Тёмная',
+    systemTheme: 'Как на телефоне',
     threads: 'Число потоков',
     clusterThreshold: 'Порог кластеризации спикеров',
     vadThreshold: 'Порог VAD',

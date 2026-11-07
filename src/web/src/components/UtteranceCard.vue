@@ -69,17 +69,22 @@ onBeforeUnmount(up)
 
 <style scoped>
 .utterance {
-  padding: 10px 14px 10px 12px;
+  padding: 15px 16px 16px 14px;
   border-left: 4px solid var(--u-color);
-  margin: 6px 12px;
-  border-radius: 8px;
-  background: var(--ion-color-step-50, var(--ion-background-color));
+  margin: 10px 0;
+  border-radius: var(--app-radius-sm);
+  background: var(--app-surface-solid);
+  box-shadow: 0 8px 22px rgba(74, 64, 146, 0.07);
   user-select: none;
   -webkit-user-select: none;
   transition: background 0.15s;
 }
 .utterance.active {
   background: var(--utterance-active-bg);
+  box-shadow:
+    0 10px 26px color-mix(in srgb, var(--u-color) 20%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--u-color) 35%, transparent);
+  transform: translateX(3px);
 }
 .head {
   display: flex;
@@ -89,10 +94,11 @@ onBeforeUnmount(up)
 }
 .time {
   font-size: 12px;
-  color: var(--ion-color-medium);
+  color: var(--app-muted);
 }
 .text {
   margin: 6px 0 0;
-  line-height: 1.45;
+  color: var(--app-ink);
+  line-height: 1.55;
 }
 </style>
