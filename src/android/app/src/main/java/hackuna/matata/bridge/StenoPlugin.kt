@@ -23,6 +23,7 @@ import hackuna.matata.core.data.TranscriptRepository
 import hackuna.matata.core.data.export.ExportFormat
 import hackuna.matata.core.data.export.TranscriptExporter
 import hackuna.matata.core.model.ErrorCode
+import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.StenoException
 import hackuna.matata.core.model.toErrorCode
 import hackuna.matata.ml.runtime.ModelManager
@@ -202,7 +203,10 @@ class StenoPlugin : Plugin(), KoinComponent {
     private fun doProcess(call: PluginCall) = io(call) {
         val id = call.requireString("id")
         repo.getRecording(id) ?: throw StenoException(ErrorCode.UNKNOWN, "Запись $id не найдена")
-        val config = JsMapping.pipelineConfig(call.getObject("options"), settings.current())
+        // База — значения по умолчанию из кода (PipelineConfig), а не прошлые сохранённые:
+        // иначе новые пороги из кода не доходили бы до уже установленного приложения.
+        // Сохраняем только как журнал «с какими параметрами обрабатывали последний раз».
+        val config = JsMapping.pipelineConfig(call.getObject("options"), PipelineConfig())
         settings.save(config)
         if (!controller.start(id, config)) throw StenoException(ErrorCode.UNKNOWN, "Уже идёт другая обработка")
         call.resolve()

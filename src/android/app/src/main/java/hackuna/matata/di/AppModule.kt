@@ -1,6 +1,7 @@
 package hackuna.matata.di
 
 import hackuna.matata.BuildTypeConfig
+import hackuna.matata.core.model.SpeechRecognizerFactory
 import hackuna.matata.core.model.TranscriptionPipeline
 import hackuna.matata.ml.runtime.ModelManager
 import hackuna.matata.pipeline.REAL_PIPELINE
@@ -29,4 +30,7 @@ val appModule = module {
         }
         TranscriptionController(androidContext(), get(), provider, get(named(APP_SCOPE)))
     }
+
+    // Debug-заглушка ASR подменяет настоящую фабрику из asrModule (appModule грузится последним).
+    BuildTypeConfig.fakeAsrFactory()?.let { fake -> single<SpeechRecognizerFactory> { fake } }
 }

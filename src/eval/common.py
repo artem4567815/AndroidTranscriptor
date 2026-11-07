@@ -54,6 +54,29 @@ def transcript_text(items: list[dict]) -> str:
     return " ".join(u["text"].strip() for u in items if u["text"].strip())
 
 
+# ---- Предобработка — порт DefaultAudioPreprocessor (core/audio), чтобы стенд совпадал с приложением ----
+
+def preprocess(samples, target_peak: float = 0.9, max_gain: float = 10.0):
+    """DC-фильтр y[n] = x[n] - x[n-1] + 0.995*y[n-1] и нормализация пика (как в Kotlin)."""
+    import numpy as np
+
+    x = np.asarray(samples, dtype=np.float64)
+    if x.size == 0:
+        return np.asarray(samples, dtype=np.float32)
+    # y[n] = 0.995*y[n-1] + (x[n] - x[n-1]) — однополюсный фильтр; считаем блоками через cumsum-трюк нельзя,
+    # поэтому простой цикл: ~1 с на минуту аудио, для стенда достаточно.
+    d = np.diff(x, prepend=0.0)
+    y = np.empty_like(x)
+    acc = 0.0
+    for i in range(x.size):
+        acc = d[i] + 0.995 * acc
+        y[i] = acc
+    peak = float(np.max(np.abs(y)))
+    if peak > 1e-6:
+        y = np.clip(y * min(target_peak / peak, max_gain), -1.0, 1.0)
+    return y.astype(np.float32)
+
+
 # ---- Склейка и нарезка — порт UtteranceMerger / SegmentPlanner из модуля pipeline ----
 
 @dataclass
@@ -94,13 +117,39 @@ def pause_midpoints(speech: list[tuple[int, int]]) -> list[int]:
     return [(a[1] + b[0]) // 2 for a, b in zip(speech, speech[1:]) if b[0] > a[1]]
 
 
+def resolve_overlaps(segments: list[tuple[int, int, int]]) -> list[tuple[int, int, int]]:
+    """Порт SegmentPlanner.resolveOverlaps: каждый момент — одному спикеру. (speaker, start, end)."""
+    out: list[list[int]] = []
+    for spk, start, end in sorted(segments, key=lambda s: (s[1], s[2])):
+        if out and start < out[-1][1]:
+            start = out[-1][1]  # начало предыдущего могли сдвинуть разрезом
+        if end <= start:
+            continue
+        if not out or start >= out[-1][2]:
+            out.append([spk, start, end])
+            continue
+        prev = out[-1]
+        if spk == prev[0]:
+            prev[2] = max(prev[2], end)
+        elif end < prev[2]:
+            tail_end = prev[2]
+            prev[2] = start
+            out.append([spk, start, end])
+            out.append([prev[0], end, tail_end])
+        else:
+            mid = (start + prev[2]) // 2
+            prev[2] = mid
+            out.append([spk, mid, end])
+    return [(s, a, b) for s, a, b in out if b > a]
+
+
 def plan_segments(segments: list[tuple[int, int, int]], speech: list[tuple[int, int]], cfg: dict,
                   duration_ms: int) -> list[tuple[int, int, int, int, int]]:
     """(speaker, start, end) → [(speaker, start, end, audio_start, audio_end)]."""
     max_ms, pad, min_ms = cfg["maxSegmentMs"], cfg["segmentPaddingMs"], cfg["minUtteranceMs"]
     cuts = pause_midpoints(speech)
     out = []
-    for spk, start, end in sorted((s for s in segments if s[2] - s[1] >= min_ms), key=lambda s: s[1]):
+    for spk, start, end in (s for s in resolve_overlaps(segments) if s[2] - s[1] >= min_ms):
         cur = start
         inside = [c for c in cuts if start < c < end]
         while end - cur > max_ms:

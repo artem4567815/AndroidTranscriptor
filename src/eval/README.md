@@ -24,6 +24,9 @@ m4a/mp3 лучше сначала перевести: `ffmpeg -i in.m4a -ac 1 -a
 ```bash
 python run_pipeline.py data/*.wav -o out/                       # гипотезы out/<имя>.json + timings
 python run_pipeline.py data/cats_1.wav --cluster-threshold 0.6  # подбор порога
+python run_pipeline.py data/*.wav --diarization-only -o out_diar  # только «кто когда» (без ASR), секунды на запись
+python run_pipeline.py data/*.wav --diarization-only --window-shift 0.2  # шаг окна сегментации: скорость vs точность
+python run_pipeline.py data/*.wav --diarization-only --embedding other.onnx  # другая модель отпечатков голоса
 python eval_wer.py --data data --out out                         # WER (нижний регистр, ё→е, без пунктуации)
 python eval_wer.py --data data --out out --keep-punct            # WER с пунктуацией
 python eval_der.py --data data --out out --collar-ms 250         # DER
@@ -33,6 +36,9 @@ python report.py --data data --out out > ../../docs/report.md    # сводна�
 
 RTF телефона: debug-сборка пишет `Android/data/hackuna.matata/files/exports/<id>.timings.json`;
 `adb pull` их, переименуйте в `<имя>.timings.json` и передайте `report.py --timings <каталог>`.
+
+Перед VAD и диаризацией стенд делает ту же предобработку, что приложение (`common.preprocess` — порт
+`DefaultAudioPreprocessor`): без неё результаты диаризации на ПК и телефоне расходились.
 
 Все скрипты поддерживают `--help`. Склейка реплик в `common.py` — порт `UtteranceMerger`/`SegmentPlanner`
 из Kotlin; меняете логику там — меняйте и здесь.

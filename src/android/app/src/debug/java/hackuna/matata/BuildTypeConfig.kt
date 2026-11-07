@@ -1,5 +1,6 @@
 package hackuna.matata
 
+import hackuna.matata.core.model.SpeechRecognizerFactory
 import hackuna.matata.core.model.TranscriptionPipeline
 import org.koin.core.Koin
 
@@ -14,4 +15,8 @@ object BuildTypeConfig {
         "false" -> null
         else -> if (modelsReady) null else FakePipeline(koin.get())
     }
+
+    /** -Psteno.fakeAsr=true: настоящие VAD и диаризация, но вместо распознавания — длительность куска. */
+    fun fakeAsrFactory(): SpeechRecognizerFactory? =
+        if (BuildConfig.FAKE_ASR == "true") SpeechRecognizerFactory { FakeSpeechRecognizer() } else null
 }

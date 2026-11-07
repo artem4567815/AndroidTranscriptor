@@ -40,4 +40,49 @@ class SegmentPlannerTest {
     fun `fallback — один спикер на всю речь`() {
         assertEquals(listOf(SpeakerSegment(0, 1, 2)), SegmentPlanner.fallbackSegments(listOf(SpeechRegion(1, 2))))
     }
+
+    @Test
+    fun `частичное пересечение разных спикеров режется посередине`() {
+        val out = SegmentPlanner.resolveOverlaps(listOf(SpeakerSegment(0, 0, 5000), SpeakerSegment(1, 4000, 9000)))
+        assertEquals(listOf(SpeakerSegment(0, 0, 4500), SpeakerSegment(1, 4500, 9000)), out)
+    }
+
+    @Test
+    fun `короткая реплика внутри длинной разрезает длинную`() {
+        val out = SegmentPlanner.resolveOverlaps(listOf(SpeakerSegment(0, 0, 10_000), SpeakerSegment(1, 4000, 5000)))
+        assertEquals(
+            listOf(SpeakerSegment(0, 0, 4000), SpeakerSegment(1, 4000, 5000), SpeakerSegment(0, 5000, 10_000)),
+            out,
+        )
+    }
+
+    @Test
+    fun `пересечение одного спикера сливается`() {
+        val out = SegmentPlanner.resolveOverlaps(listOf(SpeakerSegment(2, 0, 3000), SpeakerSegment(2, 2000, 6000)))
+        assertEquals(listOf(SpeakerSegment(2, 0, 6000)), out)
+    }
+
+    @Test
+    fun `после разрешения ни один момент не принадлежит двум спикерам`() {
+        val input = listOf(
+            SpeakerSegment(0, 0, 8000), SpeakerSegment(1, 1000, 3000), SpeakerSegment(2, 2500, 12_000),
+            SpeakerSegment(0, 11_000, 15_000), SpeakerSegment(1, 14_000, 14_500),
+        )
+        val out = SegmentPlanner.resolveOverlaps(input)
+        assertTrue(out.zipWithNext().all { (a, b) -> a.endMs <= b.startMs })
+        assertTrue(out.all { it.endMs > it.startMs })
+        // Вся исходная речь покрыта: от 0 до 15 с без дыр.
+        assertEquals(0L, out.first().startMs)
+        assertEquals(15_000L, out.last().endMs)
+        assertTrue(out.zipWithNext().all { (a, b) -> a.endMs == b.startMs })
+    }
+
+    @Test
+    fun `пересекающиеся сегменты не уходят в ASR дважды`() {
+        val chunks = SegmentPlanner.plan(
+            listOf(SpeakerSegment(0, 0, 5000), SpeakerSegment(1, 4000, 9000)),
+            emptyList(), cfg.copy(segmentPaddingMs = 0), durationMs = 9000,
+        )
+        assertEquals(listOf(0L to 4500L, 4500L to 9000L), chunks.map { it.startMs to it.endMs })
+    }
 }

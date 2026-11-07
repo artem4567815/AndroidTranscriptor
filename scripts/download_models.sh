@@ -18,7 +18,7 @@ sha256() { shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1 || sha256sum "$1" | cu
 fetch() {
   local url="$1" out="$2" expected="$3"
   echo "==> $url"
-  curl -fL --retry 3 -o "$out" "$url"
+  curl -fL --retry 5 --retry-all-errors --retry-delay 2 -o "$out" "$url"
   local actual; actual="$(sha256 "$out")"
   if [[ -n "$expected" && "$actual" != "$expected" ]]; then
     echo "Ошибка sha256 для $(basename "$out"): $actual != $expected" >&2
@@ -54,8 +54,12 @@ fetch "$REL/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.ta
 tar -xjf "$TMP/seg.tar.bz2" -C "$TMP"
 cp "$(pick "$TMP/sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx" "$TMP/sherpa-onnx-pyannote-segmentation-3-0/model.onnx")" \
   "$DEST/diarization/segmentation.onnx"
-fetch "$REL/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx" \
-  "$DEST/diarization/embedding.onnx" ""
+# Отпечатки голоса: CAM++, обученная на VoxCeleb (голоса ~145 национальностей, в т.ч. русские).
+# Русской модели у sherpa-onnx нет; китайская zh-cn хуже подходит. Для сравнения на стенде можно
+# подставить другую: EMBEDDING=wespeaker_en_voxceleb_resnet34_LM.onnx EMBEDDING_SHA256=... $0
+EMBEDDING="${EMBEDDING:-3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx}"
+EMBEDDING_SHA256="${EMBEDDING_SHA256:-357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b}"
+fetch "$REL/speaker-recongition-models/$EMBEDDING" "$DEST/diarization/embedding.onnx" "$EMBEDDING_SHA256"
 
 # 4. LLM (роль 4)
 if [[ "${1:-}" == "--with-llm" ]]; then

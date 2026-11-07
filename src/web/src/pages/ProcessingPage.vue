@@ -6,6 +6,7 @@ import { useRecordingsStore } from '@/stores/recordings'
 import { useSettingsStore } from '@/stores/settings'
 import { STAGES } from '@/native'
 import { ru } from '@/i18n/ru'
+import type { Stage } from '@/native'
 import { formatMs } from '@/utils/time'
 
 const props = defineProps<{ id: string }>()

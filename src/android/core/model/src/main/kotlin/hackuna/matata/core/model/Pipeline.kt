@@ -24,6 +24,13 @@ data class PipelineConfig(
     val enableLlmCorrection: Boolean = false,
     /** Расширение контракта: порог Silero VAD (SettingsPage). */
     val vadThreshold: Float = 0.5f,
+    /**
+     * Шаг окна сегментации pyannote в долях окна (окно 10 с): 0.1 → шаг 1 с.
+     * Больше шаг — меньше окон и отпечатков голоса → диаризация быстрее, но границы грубее.
+     * Оставлен 0.1 (шаг 1 с, как в pyannote): 0.2–0.25 быстрее в ~1,8–2×, но на тестовых записях
+     * число спикеров нестабильно (docs/TESTS.md). Менять только по DER на своих размеченных записях.
+     */
+    val diarizationWindowShift: Float = 0.1f,
 )
 
 data class TranscriptionResult(

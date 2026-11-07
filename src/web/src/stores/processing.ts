@@ -27,6 +27,20 @@ const finishedAt = ref<number | null>(null)
 const now = ref(Date.now())
 let ticker: ReturnType<typeof setInterval> | null = null
 let listening: Promise<void> | null = null
+export const useProcessingStore = defineStore('processing', () => {
+  const recordingId = ref<string | null>(null)
+  const running = ref(false)
+  /** Нажали «Отмена», но обработка ещё не остановилась. */
+  const cancelRequested = ref(false)
+  const completed = ref(false)
+  const failure = ref<(FailedEvent & { text: string }) | null>(null)
+  const stages = reactive(emptyStages())
+  const currentStage = ref<Stage | null>(null)
+  const startedAt = ref<number | null>(null)
+  const finishedAt = ref<number | null>(null)
+  const now = ref(Date.now())
+  let ticker: ReturnType<typeof setInterval> | null = null
+  let listening: Promise<void> | null = null
 
   const elapsedMs = computed(() =>
     startedAt.value ? (finishedAt.value ?? now.value) - startedAt.value : 0,
@@ -41,6 +55,7 @@ let listening: Promise<void> | null = null
     if (ticker) clearInterval(ticker)
     ticker = null
     finishedAt.value = Date.now()
+    cancelRequested.value = false
   }
 
   /** Подписка на события плагина — один раз за жизнь приложения. */
@@ -94,6 +109,7 @@ let listening: Promise<void> | null = null
     resetStages()
     failure.value = null
     completed.value = false
+    cancelRequested.value = false
     running.value = true
     startedAt.value = Date.now()
     finishedAt.value = null
@@ -117,6 +133,8 @@ let listening: Promise<void> | null = null
   }
 
   async function cancel() {
+    if (!running.value || cancelRequested.value) return
+    cancelRequested.value = true
     await (await getSteno()).cancel()
   }
 
@@ -124,6 +142,7 @@ export function useProcessingStore() {
   return {
     recordingId,
     running,
+    cancelRequested,
     completed,
     failure,
     stages,
