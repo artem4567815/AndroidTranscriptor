@@ -102,10 +102,12 @@ async function saveDetails(title: string, names: Record<string, string>) {
         @click="detailsOpen = true"
       >
         <span>{{ recording?.title ?? ru.transcript.title }}</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m4 20 4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" />
-          <path d="m13.8 7.2 3 3" />
-        </svg></button
+        <i class="edit-title-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="m4 20 4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" />
+            <path d="m13.8 7.2 3 3" />
+          </svg>
+        </i></button
       ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
@@ -212,8 +214,8 @@ async function saveDetails(title: string, names: Record<string, string>) {
   text-overflow: ellipsis;
 }
 .title-button svg {
-  width: 15px;
-  height: 15px;
+  width: 17px;
+  height: 17px;
   flex: 0 0 auto;
   color: var(--app-primary);
   fill: none;
@@ -221,6 +223,24 @@ async function saveDetails(title: string, names: Record<string, string>) {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
+}
+.edit-title-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--app-primary) 40%, transparent);
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--app-primary-soft), var(--app-primary));
+  box-shadow:
+    0 5px 12px color-mix(in srgb, var(--app-primary) 28%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--app-primary) 10%, transparent);
+}
+.edit-title-mark svg {
+  color: #fff;
+  stroke-width: 2.2;
 }
 .title-button:active {
   opacity: 0.7;
