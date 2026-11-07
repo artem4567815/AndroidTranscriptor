@@ -15,3 +15,11 @@ export function speakerLabel(speakerId: string, names: Record<string, string>): 
   if (name) return name
   return `Спикер ${speakerId.replace(/^speaker_/, '')}`
 }
+
+/**
+ * В итогах LLM упоминает участников как speaker_N — показываем текущие имена (или «Спикер N»).
+ * Подставляем при показе, а не в Kotlin: переименование спикера сразу видно и в итогах.
+ */
+export function withSpeakerNames(text: string, names: Record<string, string>): string {
+  return text.replace(/\bspeaker_(\d+)\b/gi, (_, n: string) => speakerLabel(`speaker_${n}`, names))
+}

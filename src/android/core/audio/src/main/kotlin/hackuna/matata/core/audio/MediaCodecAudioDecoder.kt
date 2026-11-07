@@ -77,7 +77,7 @@ class MediaCodecAudioDecoder(private val context: Context) : AudioDecoder {
             ?.getLong(MediaFormat.KEY_DURATION)
             ?.let { (it * PcmAudio.MODEL_SAMPLE_RATE / 1_000_000L).toInt() }
             ?.takeIf { it > 0 }
-        var resampler = StreamingMonoResampler(sampleRate, PcmAudio.MODEL_SAMPLE_RATE, estimatedSamples)
+        var resampler = StreamingResampler(sampleRate, PcmAudio.MODEL_SAMPLE_RATE, estimatedSamples?.toLong() ?: 0)
         val info = MediaCodec.BufferInfo()
         var inputDone = false
         var outputDone = false
@@ -104,7 +104,7 @@ class MediaCodecAudioDecoder(private val context: Context) : AudioDecoder {
                         val f = codec.outputFormat
                         sampleRate = f.getInteger(MediaFormat.KEY_SAMPLE_RATE)
                         channels = f.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-                        resampler = StreamingMonoResampler(sampleRate, PcmAudio.MODEL_SAMPLE_RATE, estimatedSamples)
+                        resampler = StreamingResampler(sampleRate, PcmAudio.MODEL_SAMPLE_RATE, estimatedSamples?.toLong() ?: 0)
                         if (f.containsKey(MediaFormat.KEY_PCM_ENCODING)) {
                             pcmEncoding = f.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         }
@@ -124,7 +124,7 @@ class MediaCodecAudioDecoder(private val context: Context) : AudioDecoder {
             codec.release()
             extractor.release()
         }
-        val samples = resampler.toArray()
+        val samples = resampler.finish()
         if (samples.isEmpty()) throw StenoException(ErrorCode.DECODE_FAILED, "Пустая аудиодорожка")
         Log.i(TAG, "decoded $mime ${sampleRate}Hz ch=$channels frames=${samples.size}")
         return PcmAudio(samples, PcmAudio.MODEL_SAMPLE_RATE)
@@ -134,7 +134,7 @@ class MediaCodecAudioDecoder(private val context: Context) : AudioDecoder {
         buf: java.nio.ByteBuffer,
         channels: Int,
         encoding: Int,
-        out: StreamingMonoResampler,
+        out: StreamingResampler,
     ) {
         when (encoding) {
             AudioFormat.ENCODING_PCM_FLOAT -> {
@@ -159,49 +159,6 @@ class MediaCodecAudioDecoder(private val context: Context) : AudioDecoder {
     private companion object {
         const val TAG = "AudioDecoder"
         const val TIMEOUT_US = 10_000L
-    }
-
-    /**
-     * Downmixes and resamples decoder output as it arrives. Keeping the source PCM out of memory is
-     * important for long recordings: a 30-minute stereo file can otherwise require several hundred
-     * megabytes before the pipeline even starts.
-     */
-    private class StreamingMonoResampler(
-        private val fromRate: Int,
-        private val toRate: Int,
-        initialCapacity: Int?,
-    ) {
-        private val output = FloatBuffer(initialCapacity ?: (1 shl 16))
-        private val ratio = fromRate.toDouble() / toRate
-        private var inputCount = 0L
-        private var outputPosition = 0.0
-        private var previous = 0f
-        private var hasPrevious = false
-
-        fun add(sample: Float) {
-            if (fromRate == toRate) {
-                output.add(sample)
-                return
-            }
-            if (!hasPrevious) {
-                previous = sample
-                hasPrevious = true
-                inputCount = 1
-                output.add(sample)
-                outputPosition += ratio
-                return
-            }
-            val currentIndex = inputCount
-            while (outputPosition < currentIndex) {
-                val fraction = outputPosition - (currentIndex - 1)
-                output.add((previous + (sample - previous) * fraction.toFloat()).coerceIn(-1f, 1f))
-                outputPosition += ratio
-            }
-            previous = sample
-            inputCount++
-        }
-
-        fun toArray(): FloatArray = output.toArray()
     }
 }
 

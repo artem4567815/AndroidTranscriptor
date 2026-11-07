@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { STAGES, type Stage } from '@/native'
+import { PROCESSING_STAGES as STAGES, type Stage } from '@/native'
 import { ru } from '@/i18n/ru'
 const props = defineProps<{
   stages: Record<Stage, { fraction: number; done: boolean }>

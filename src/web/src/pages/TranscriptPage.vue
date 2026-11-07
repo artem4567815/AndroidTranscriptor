@@ -10,6 +10,7 @@ import ToastMessage from '@/components/ToastMessage.vue'
 import DownloadDialog from '@/components/DownloadDialog.vue'
 import RecordingDetailsDialog from '@/components/RecordingDetailsDialog.vue'
 import EditTextDialog from '@/components/EditTextDialog.vue'
+import { withSpeakerNames } from '@/utils/speakers'
 
 const props = defineProps<{ id: string }>()
 const store = useTranscriptStore()
@@ -24,6 +25,11 @@ const isPlaying = ref(false)
 const detailsOpen = ref(false)
 const editTextIndex = ref<number | null>(null)
 const hasProtocol = computed(() => Boolean(store.result.value?.protocol?.trim()))
+const protocolText = computed(() =>
+  withSpeakerNames(store.result.value?.protocol ?? '', store.speakerNames.value),
+)
+/** Вкладка «Итоги» видна, когда они есть или ещё готовятся. */
+const showTabs = computed(() => hasProtocol.value || store.analysisPending.value)
 onMounted(async () => {
   if (!recordings.items.value.length) await recordings.refresh()
   await store.load(props.id)
@@ -123,17 +129,21 @@ async function saveDetails(title: string, names: Record<string, string>) {
       ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
-      <div v-if="hasProtocol" class="tabs">
+      <div v-if="showTabs" class="tabs">
         <button :class="{ active: tab === 'transcript' }" @click="tab = 'transcript'">
           {{ ru.transcript.tabTranscript }}</button
         ><button :class="{ active: tab === 'protocol' }" @click="tab = 'protocol'">
-          {{ ru.transcript.tabProtocol }}
+          {{ ru.transcript.tabProtocol
+          }}<span v-if="store.analysisPending.value" class="tab-spinner" aria-hidden="true"></span>
         </button>
       </div>
       <p v-if="store.loading.value" class="loading">Загружаем расшифровку…</p>
       <p v-else-if="store.error.value" class="inline-error">{{ store.error.value }}</p>
       <template v-else-if="store.result.value">
-        <div v-if="tab === 'transcript' || !hasProtocol" class="utterances">
+        <div v-if="tab === 'transcript' || !showTabs" class="utterances">
+          <p v-if="store.analysisPending.value" class="analysis-note" role="status">
+            <span class="tab-spinner" aria-hidden="true"></span>{{ ru.transcript.analysisPending }}
+          </p>
           <div class="transcript-meta">
             <span class="result-pill"
               ><b>{{ store.utterances.value.length }}</b> реплик <em>·</em> RTF
@@ -160,7 +170,11 @@ async function saveDetails(title: string, names: Record<string, string>) {
           />
         </div>
         <article v-else class="protocol surface">
-          <pre>{{ store.result.value.protocol }}</pre>
+          <pre v-if="hasProtocol">{{ protocolText }}</pre>
+          <p v-else class="analysis-wait" role="status">
+            <span class="tab-spinner" aria-hidden="true"></span
+            >{{ ru.transcript.analysisPendingShort }}
+          </p>
         </article>
       </template>
     </main>
@@ -378,6 +392,52 @@ async function saveDetails(title: string, names: Record<string, string>) {
   white-space: pre-wrap;
   font: inherit;
   line-height: 1.55;
+}
+.analysis-note {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--app-lilac);
+  color: var(--app-ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.analysis-wait {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  color: var(--app-muted);
+}
+.tab-spinner {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: tab-spin 0.8s linear infinite;
+}
+.analysis-note .tab-spinner,
+.analysis-wait .tab-spinner {
+  margin-left: 0;
+  color: var(--app-primary);
+}
+@keyframes tab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab-spinner {
+    animation: none;
+  }
 }
 .loading {
   padding: 50px 0;

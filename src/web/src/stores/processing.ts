@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import {
   getSteno,
-  STAGES,
+  PROCESSING_STAGES,
   type FailedEvent,
   type PipelineOptions,
   type Stage,
@@ -17,10 +17,9 @@ export interface StageState {
 }
 
 function emptyStages(): Record<Stage, StageState> {
-  return Object.fromEntries(STAGES.map((s) => [s, { fraction: 0, done: false }])) as Record<
-    Stage,
-    StageState
-  >
+  return Object.fromEntries(
+    PROCESSING_STAGES.map((s) => [s, { fraction: 0, done: false }]),
+  ) as Record<Stage, StageState>
 }
 
 const recordingId = ref<string | null>(null)
@@ -62,9 +61,9 @@ async function ensureListeners(): Promise<void> {
   listeningPlugin = steno
   listening = (async () => {
     await steno.addListener('progress', (e) => {
-      if (e.id !== recordingId.value) return
+      if (e.id !== recordingId.value || !PROCESSING_STAGES.includes(e.stage)) return
       // Все этапы до текущего считаем завершёнными: события могут прийти пачкой.
-      for (const s of STAGES) {
+      for (const s of PROCESSING_STAGES) {
         if (s === e.stage) break
         stages[s] = { fraction: 1, done: true }
       }
@@ -73,7 +72,7 @@ async function ensureListeners(): Promise<void> {
     })
     await steno.addListener('completed', (e) => {
       if (e.id !== recordingId.value) return
-      for (const s of STAGES) stages[s] = { fraction: 1, done: true }
+      for (const s of PROCESSING_STAGES) stages[s] = { fraction: 1, done: true }
       running.value = false
       completed.value = true
       stopTicker()

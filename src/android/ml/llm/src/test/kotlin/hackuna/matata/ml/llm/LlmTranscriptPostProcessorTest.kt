@@ -29,60 +29,40 @@ class LlmTranscriptPostProcessorTest {
         override fun close() = Unit
     }
 
-    /** Ответ Qwen3-1.7B на тестовую планёрку (с лишними пробелами в концах строк, как у модели). */
+    /** Ответ Qwen3-1.7B на тестовую планёрку — свободный текст (с остатками Markdown и пробелами, как бывает). */
     private val meetingAnswer = """
-        Участники:
-        speaker_1 — руководитель, сессия.
-        speaker_2 — технический специалист, сопровождение.
-        speaker_9 — призрак
-
-        Тема: Планёрка по подготовке мобильного приложения.
-
-        **Решения:**
-        - Релиз-кандидат к 15 ноября.
+        **В разговоре** обсуждались сроки запуска приложения и бюджет на тестирование.  
         ---
-        Поручения:
-        - speaker_2 — подготовить сценарий демонстрации.
+        Релиз-кандидат будет к 15 ноября, скрипт нагрузочного тестирования — до 20 ноября.  
     """.trimIndent()
 
     @Test
-    fun `один запрос даёт протокол и роли известных спикеров`() = runTest {
+    fun `итоги — один запрос, свободный текст без Markdown`() = runTest {
         val engine = ScriptedEngine { meetingAnswer }
-        val p = LlmTranscriptPostProcessor(engine).protocol(t)
+        val text = LlmTranscriptPostProcessor(engine).protocol(t)
 
-        assertEquals(mapOf("speaker_1" to "Руководитель", "speaker_2" to "Технический специалист"), p.roles)
         assertEquals(1, engine.prompts.size)
         assertTrue(engine.prompts.single().contains("speaker_1: открываем заседание"))
-        assertEquals(Prompts.PROTOCOL_SYSTEM, engine.systems.single())
-        // Markdown и линии убраны, хвостовые пробелы тоже.
-        assertFalse(p.text.contains("**"))
-        assertFalse(p.text.lines().any { it == "---" || it.endsWith(" ") })
-        assertTrue(p.text.contains("Решения:"))
-    }
-
-    @Test
-    fun `роли в строку через точку с запятой и через запятую`() {
+        assertEquals(Prompts.SUMMARY_SYSTEM, engine.systems.single())
         assertEquals(
-            mapOf("speaker_1" to "Секретарь", "speaker_2" to "Председатель"),
-            Prompts.parseRoles("Участники: speaker_1 – секретарь, speaker_2 – председатель.\nТема: сметана"),
+            "В разговоре обсуждались сроки запуска приложения и бюджет на тестирование.\n" +
+                "Релиз-кандидат будет к 15 ноября, скрипт нагрузочного тестирования — до 20 ноября.",
+            text,
         )
     }
 
     @Test
-    fun `перечисление реплик вместо ролей не принимается`() {
-        val game = "Участники: speaker_1 – Птица; speaker_2 – Старика; speaker_1 – Аллигатор.\nТема: игра"
-        assertEquals(emptyMap<String, String>(), Prompts.parseRoles(game))
-    }
-
-    @Test
-    fun `без раздела участников ролей нет`() {
-        assertEquals(emptyMap<String, String>(), Prompts.parseRoles("Тема: что-то\nПоручения:\n- speaker_1 — сделать"))
+    fun `промпт не навязывает шаблон и не просит роли`() {
+        // Жёсткий шаблон давал кривые итоги на играх, роли модель путала (docs/TESTS.md).
+        listOf("Тема:", "Решения:", "Поручения:", "Участники:").forEach {
+            assertFalse(it, Prompts.SUMMARY_SYSTEM.contains(it))
+        }
     }
 
     @Test
     fun `эхо расшифровки отрезается`() {
         val answer = "Тема: релиз.\n\nПоручения:\n- нет\n\nРасшифровка:\nspeaker_1: Добрый день"
-        assertEquals("Тема: релиз.\n\nПоручения:\n- нет", Prompts.cleanProtocol(answer))
+        assertEquals("Тема: релиз.\n\nПоручения:\n- нет", Prompts.cleanSummary(answer))
     }
 
     @Test
@@ -100,11 +80,11 @@ class LlmTranscriptPostProcessorTest {
 
     @Test
     fun `контекст обрезается и протокол помечается`() = runTest {
-        val pp = LlmTranscriptPostProcessor(ScriptedEngine { "Тема: заседание." }, maxContextChars = 40)
+        val pp = LlmTranscriptPostProcessor(ScriptedEngine { "Говорили о заседании." }, maxContextChars = 40)
         val r = pp.render(t)
         assertTrue(r.text.endsWith("…\n"))
         assertEquals(1000L, r.truncatedAtMs)
-        assertTrue(pp.protocol(t).text.contains("по первым 1 мин записи"))
+        assertTrue(pp.protocol(t).contains("Итоги по первым 1 мин записи"))
 
         assertNull(LlmTranscriptPostProcessor(ScriptedEngine { "" }).render(t).truncatedAtMs)
     }

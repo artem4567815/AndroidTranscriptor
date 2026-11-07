@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { speakerColorVar, speakerIndex, speakerLabel } from './speakers'
+import { speakerColorVar, speakerIndex, speakerLabel, withSpeakerNames } from './speakers'
 import { errorCode, errorMessage } from './errors'
 
 describe('speakers', () => {
@@ -13,6 +13,13 @@ describe('speakers', () => {
     expect(speakerLabel('speaker_2', {})).toBe('Спикер 2')
     expect(speakerLabel('speaker_2', { speaker_2: 'Председатель' })).toBe('Председатель')
     expect(speakerLabel('speaker_2', { speaker_2: '  ' })).toBe('Спикер 2')
+  })
+  it('в итогах speaker_N заменяется на имя', () => {
+    expect(
+      withSpeakerNames('speaker_1 рассказала о вязании, а Speaker_2 спросил про бизнес.', {
+        speaker_2: 'Лёша',
+      }),
+    ).toBe('Спикер 1 рассказала о вязании, а Лёша спросил про бизнес.')
   })
 })
 

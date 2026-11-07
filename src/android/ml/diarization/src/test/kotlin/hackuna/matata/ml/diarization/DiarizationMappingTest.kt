@@ -3,7 +3,10 @@ package hackuna.matata.ml.diarization
 import com.k2fsa.sherpa.onnx.OfflineSpeakerDiarizationSegment
 import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.SpeakerSegment
+import hackuna.matata.core.model.SpeechRegion
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DiarizationMappingTest {
@@ -47,5 +50,24 @@ class DiarizationMappingTest {
         var got = -1f
         ProgressCallback { got = it }.invoke(1, 4, 0)
         assertEquals(0.25f, got)
+    }
+
+    @Test
+    fun `вырезки короткого участка не выходят за запись и не уже участка`() {
+        val u = SpeechRegion(1000, 1600)
+        val crops = DiarizationMapping.shortUnitCrops(u, from = 900, to = 1700, durationMs = 1750)
+        assertEquals(
+            listOf(900L to 1700L, 800L to 1700L, 900L to 1750L, 800L to 1750L, 1000L to 1600L),
+            crops,
+        )
+        // У начала записи окно не уходит в минус.
+        assertEquals(0L to 300L, DiarizationMapping.shortUnitCrops(SpeechRegion(0, 300), 0, 300, 5000)[1])
+    }
+
+    @Test
+    fun `среднее отпечатков — по нормированным векторам`() {
+        val avg = DiarizationMapping.average(listOf(floatArrayOf(3f, 0f), floatArrayOf(0f, 0.5f)))!!
+        assertArrayEquals(floatArrayOf(0.5f, 0.5f), avg, 1e-6f)
+        assertNull(DiarizationMapping.average(emptyList()))
     }
 }

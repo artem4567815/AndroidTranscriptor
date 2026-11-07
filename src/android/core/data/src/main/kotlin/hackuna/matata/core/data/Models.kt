@@ -2,6 +2,7 @@ package hackuna.matata.core.data
 
 import hackuna.matata.core.model.ErrorCode
 import hackuna.matata.core.model.Stage
+import hackuna.matata.core.model.rtfOf
 import hackuna.matata.core.model.Transcript
 
 enum class RecordingStatus { NEW, PROCESSING, DONE, ERROR }
@@ -30,5 +31,5 @@ data class StoredResult(
     val timings: Map<Stage, Long>,
     val audioDurationMs: Long,
 ) {
-    val rtf: Double get() = if (audioDurationMs <= 0) 0.0 else timings.values.sum().toDouble() / audioDurationMs
+    val rtf: Double get() = rtfOf(timings, audioDurationMs)
 }

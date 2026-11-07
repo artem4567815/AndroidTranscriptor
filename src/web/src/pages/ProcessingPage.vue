@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useProcessingStore } from '@/stores/processing'
 import { useRecordingsStore } from '@/stores/recordings'
 import { useSettingsStore } from '@/stores/settings'
-import { STAGES } from '@/native'
+import { PROCESSING_STAGES as STAGES } from '@/native'
 import { ru } from '@/i18n/ru'
 import { formatMs } from '@/utils/time'
 
@@ -82,7 +82,7 @@ function selectSpeaker(count: number) {
         <label class="switch-row"
           ><span
             ><b>{{ ru.processing.llmProtocol }}</b
-            ><small>Сформирует краткий протокол встречи</small></span
+            ><small>{{ ru.processing.llmProtocolHint }}</small></span
           ><input
             v-model="settings.enableLlmProtocol.value"
             class="toggle-input"

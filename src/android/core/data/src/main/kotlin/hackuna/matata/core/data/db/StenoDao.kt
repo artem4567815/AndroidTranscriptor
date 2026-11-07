@@ -55,6 +55,17 @@ interface StenoDao {
     @Upsert
     suspend fun upsertResult(r: ResultEntity)
 
+    @Query("DELETE FROM utterances WHERE recordingId = :id AND variant = :variant")
+    suspend fun deleteUtterances(id: String, variant: Int)
+
+    /** Итог LLM: результат и вариант «правка LLM»; сырой ASR (и правки пользователя в нём) не трогаем. */
+    @Transaction
+    suspend fun replaceAnalysis(result: ResultEntity, corrected: List<UtteranceEntity>) {
+        deleteUtterances(result.recordingId, UtteranceEntity.LLM)
+        if (corrected.isNotEmpty()) insertUtterances(corrected)
+        upsertResult(result)
+    }
+
     @Transaction
     suspend fun replaceResult(result: ResultEntity, utterances: List<UtteranceEntity>, status: String) {
         deleteUtterances(result.recordingId)

@@ -12,11 +12,14 @@ import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.PipelineEvent
 import hackuna.matata.core.model.Stage
 import hackuna.matata.core.model.TranscriptionPipeline
+import hackuna.matata.core.model.TranscriptionResult
 import hackuna.matata.core.model.toErrorCode
+import hackuna.matata.core.model.wantsAnalysis
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -50,6 +53,9 @@ class TranscriptionController(
         data class Progress(val id: String, val stage: Stage, val fraction: Float) : Event
         data class Completed(val id: String) : Event
         data class Failed(val id: String, val stage: Stage, val code: ErrorCode, val message: String) : Event
+
+        /** LLM-анализ (итоги, имена спикеров) уже показанной расшифровки: [running] = идёт / закончился. */
+        data class Analysis(val id: String, val running: Boolean) : Event
     }
 
     private val _state = MutableStateFlow<State>(State.Idle)
@@ -60,15 +66,31 @@ class TranscriptionController(
 
     private var job: Job? = null
 
+    /** Запись, для которой сейчас идёт LLM-анализ (расшифровка уже сохранена и показана). */
+    @Volatile
+    var analyzingId: String? = null
+        private set
+
     val runningId: String? get() = (state.value as? State.Running)?.id
 
-    /** @return false, если уже идёт другая обработка (одна за раз). */
+    /**
+     * @return false, если уже идёт другая расшифровка (одна за раз). Идущий LLM-анализ прошлой записи
+     * не мешает: он прерывается (у той записи просто не будет итогов), новая расшифровка важнее.
+     */
     @Synchronized
     fun start(id: String, config: PipelineConfig): Boolean {
-        if (job?.isActive == true) return false
+        val previous = job
+        if (previous?.isActive == true) {
+            if (analyzingId == null) return false
+            previous.cancel(CancellationException("Новая обработка"))
+        }
         _state.value = State.Running(id, "", Stage.DECODE, 0f)
-        ContextCompat.startForegroundService(context, Intent(context, TranscriptionService::class.java))
-        job = scope.launch { runJob(id, config) }
+        job = scope.launch {
+            previous?.join()
+            _state.value = State.Running(id, "", Stage.DECODE, 0f)
+            ContextCompat.startForegroundService(context, Intent(context, TranscriptionService::class.java))
+            runJob(id, config)
+        }
         return true
     }
 
@@ -79,11 +101,14 @@ class TranscriptionController(
     private suspend fun runJob(id: String, config: PipelineConfig) {
         var stage = Stage.DECODE
         val t0 = System.currentTimeMillis()
+        var saved: TranscriptionResult? = null
+        val me = currentCoroutineContext()[Job]
         try {
             val rec = repo.getRecording(id) ?: error("Запись $id не найдена")
             repo.setStatus(id, RecordingStatus.PROCESSING)
             _state.value = State.Running(id, rec.title, stage, 0f)
-            pipelines.get().run(rec.sourcePath, config).collect { e ->
+            val pipeline = pipelines.get()
+            pipeline.run(rec.sourcePath, config).collect { e ->
                 when (e) {
                     is PipelineEvent.Progress -> {
                         stage = e.stage
@@ -91,9 +116,6 @@ class TranscriptionController(
                         _events.emit(Event.Progress(id, e.stage, e.fraction))
                     }
                     is PipelineEvent.StageDone -> Unit
-                    // Черновик без LLM: переживёт убийство процесса во время LLM (статус остаётся PROCESSING,
-                    // а resetStaleProcessing при следующем запуске переведёт запись с результатом в DONE).
-                    is PipelineEvent.TranscriptReady -> repo.saveResult(id, e.result, final = false)
                     is PipelineEvent.Failed -> {
                         stage = e.stage
                         throw e.error
@@ -108,23 +130,45 @@ class TranscriptionController(
                         val final = e.result.copy(timings = e.result.timings + (Stage.SAVE to saveMs))
                         Log.i(TAG, "stage=SAVE ms=$saveMs; total=${System.currentTimeMillis() - t0}ms rtf=${"%.3f".format(final.rtf)}")
                         if (BuildTypeConfig.WRITE_TIMINGS) TimingsWriter.write(context, rec.title, id, final)
+                        saved = e.result
                         _events.emit(Event.Progress(id, Stage.SAVE, 1f))
                         _events.emit(Event.Completed(id))
                     }
                 }
             }
+            val transcript = saved?.transcript ?: return
+            if (!config.wantsAnalysis(transcript)) return
+
+            // Пользователь уже видит расшифровку; итоги и имена спикеров подтянутся по событию.
+            stage = Stage.LLM
+            analyzingId = id
+            _state.value = State.Running(id, rec.title, Stage.LLM, 0f)
+            _events.emit(Event.Analysis(id, running = true))
+            pipeline.analyze(transcript, config)?.let { repo.saveAnalysis(id, it) }
         } catch (e: CancellationException) {
             withContext(NonCancellable) {
-                repo.setStatus(id, RecordingStatus.NEW)
-                _events.emit(Event.Failed(id, stage, ErrorCode.CANCELLED, "Обработка отменена"))
+                // Отмена во время анализа: расшифровка уже сохранена — просто без итогов.
+                if (saved == null) {
+                    repo.setStatus(id, RecordingStatus.NEW)
+                    _events.emit(Event.Failed(id, stage, ErrorCode.CANCELLED, "Обработка отменена"))
+                }
             }
         } catch (e: Throwable) {
-            val code = e.toErrorCode()
             Log.e(TAG, "processing failed at $stage", e)
-            repo.setStatus(id, RecordingStatus.ERROR, code, e.message)
-            _events.emit(Event.Failed(id, stage, code, e.message ?: e.toString()))
+            if (saved == null) {
+                val code = e.toErrorCode()
+                repo.setStatus(id, RecordingStatus.ERROR, code, e.message)
+                _events.emit(Event.Failed(id, stage, code, e.message ?: e.toString()))
+            }
         } finally {
-            _state.value = State.Idle
+            withContext(NonCancellable) {
+                if (analyzingId == id) {
+                    analyzingId = null
+                    _events.emit(Event.Analysis(id, running = false))
+                }
+            }
+            // Новая обработка могла уже стартовать (start() прервал этот анализ) — её состояние не трогаем.
+            if (job === me) _state.value = State.Idle
         }
     }
 

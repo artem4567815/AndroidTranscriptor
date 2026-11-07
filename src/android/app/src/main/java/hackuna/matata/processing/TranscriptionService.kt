@@ -82,7 +82,7 @@ class TranscriptionService : LifecycleService() {
         "DIARIZATION" -> "диаризация"
         "ASR" -> "распознавание"
         "MERGE" -> "склейка реплик"
-        "LLM" -> "LLM"
+        "LLM" -> "готовим итоги (LLM)"
         else -> "сохранение"
     }
 

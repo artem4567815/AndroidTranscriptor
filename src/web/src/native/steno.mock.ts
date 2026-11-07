@@ -6,7 +6,7 @@
  */
 import type { PluginListenerHandle } from '@capacitor/core'
 import {
-  STAGES,
+  PROCESSING_STAGES,
   type ExportFormat,
   type ModelInfo,
   type PipelineOptions,
@@ -220,6 +220,7 @@ export function createStenoMock(): StenoMock {
   let speed = 1
   let cancelled = false
   let running: string | null = null
+  let analyzing: string | null = null
   let recordTimer: ReturnType<typeof setInterval> | null = null
   let recordStartedAt = 0
 
@@ -275,11 +276,7 @@ export function createStenoMock(): StenoMock {
     const fail = failNext
     failNext = null
     try {
-      for (const stage of STAGES) {
-        if (stage === 'LLM' && !o.enableLlmProtocol && !o.enableLlmCorrection) {
-          emit('progress', { id, stage, fraction: 1 })
-          continue
-        }
+      for (const stage of PROCESSING_STAGES) {
         const steps = 10
         for (let i = 1; i <= steps; i++) {
           await sleep(STAGE_MS[stage] / steps / speed)
@@ -290,9 +287,34 @@ export function createStenoMock(): StenoMock {
           emit('progress', { id, stage, fraction: i / steps })
         }
       }
-      results.set(id, makeResult(id, o))
+      // Как в приложении: расшифровка сразу, итоги и имена — после LLM-анализа.
+      const wantsAnalysis = o.enableLlmProtocol || o.enableLlmCorrection
+      results.set(id, {
+        ...makeResult(id, o),
+        protocol: undefined,
+        llmCorrected: undefined,
+        speakerNames: {},
+        analysisPending: wantsAnalysis,
+      })
       rec.status = 'DONE'
+      running = null // анализ не мешает новой обработке (в приложении он прерывается)
       emit('completed', { id })
+      if (wantsAnalysis) {
+        analyzing = id
+        emit('analysis', { id, running: true })
+        await sleep(STAGE_MS.LLM / speed)
+        const done = makeResult(id, o)
+        const current = results.get(id)
+        // Имена, которые пользователь успел задать сам, важнее предложенных LLM.
+        results.set(id, {
+          ...done,
+          transcript: current?.transcript ?? done.transcript,
+          speakerNames: { ...done.speakerNames, ...current?.speakerNames },
+          analysisPending: false,
+        })
+        analyzing = null
+        emit('analysis', { id, running: false })
+      }
     } catch (e) {
       const err = e instanceof MockError ? e : new MockError('UNKNOWN', String(e))
       rec.status = err.code === 'CANCELLED' ? 'NEW' : 'ERROR'
@@ -391,7 +413,7 @@ export function createStenoMock(): StenoMock {
       cancelled = true
     },
     async getResult({ id }) {
-      return structuredClone(result(id))
+      return { ...structuredClone(result(id)), analysisPending: analyzing === id }
     },
     async updateUtterance({ id, index, text, speakerId }) {
       const u = result(id).transcript.transcript[index]

@@ -7,7 +7,6 @@ import hackuna.matata.core.model.DiarizerFactory
 import hackuna.matata.core.model.ErrorCode
 import hackuna.matata.core.model.LlmEngine
 import hackuna.matata.core.model.LlmEngineFactory
-import hackuna.matata.core.model.MeetingProtocol
 import hackuna.matata.core.model.PcmAudio
 import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.PipelineEvent
@@ -19,9 +18,11 @@ import hackuna.matata.core.model.SpeechRecognizerFactory
 import hackuna.matata.core.model.SpeechRegion
 import hackuna.matata.core.model.Stage
 import hackuna.matata.core.model.StenoException
-import hackuna.matata.core.model.Transcript
 import hackuna.matata.core.model.TimedToken
+import hackuna.matata.core.model.Transcript
 import hackuna.matata.core.model.TranscriptPostProcessor
+import hackuna.matata.core.model.TranscriptionResult
+import hackuna.matata.core.model.Utterance
 import hackuna.matata.core.model.VadFactory
 import hackuna.matata.core.model.VoiceActivityDetector
 import hackuna.matata.core.model.toErrorCode
@@ -80,7 +81,7 @@ class DefaultTranscriptionPipelineTest {
     }
     private val pp = PostProcessorFactory {
         object : TranscriptPostProcessor {
-            override suspend fun protocol(t: Transcript) = MeetingProtocol("протокол", mapOf("speaker_1" to "Председатель"))
+            override suspend fun protocol(t: Transcript) = "протокол"
             override suspend fun correct(t: Transcript) = t
         }
     }
@@ -103,18 +104,30 @@ class DefaultTranscriptionPipelineTest {
         // ASR получает участки VAD целиком: 0–4000 (оба отрезка спикера 7) и 5000–9000.
         assertEquals(listOf("раз", "два"), r.transcript.transcript.map { it.text })
         assertEquals(0L to 4000L, r.transcript.transcript[0].startMs to r.transcript.transcript[0].endMs)
-        assertEquals("протокол", r.protocol)
-        assertEquals(mapOf("speaker_1" to "Председатель"), r.speakerNames)
+        // LLM в расшифровку не входит: итоги — отдельным analyze() после показа.
+        assertNull(r.protocol)
+        assertEquals(emptyMap<String, String>(), r.speakerNames)
         assertNull(r.llmCorrected)
-        assertEquals(setOf(Stage.DECODE, Stage.PREPROCESS, Stage.VAD, Stage.DIARIZATION, Stage.ASR, Stage.MERGE, Stage.LLM), r.timings.keys)
+        assertEquals(setOf(Stage.DECODE, Stage.PREPROCESS, Stage.VAD, Stage.DIARIZATION, Stage.ASR, Stage.MERGE), r.timings.keys)
         assertEquals(10_000L, r.audioDurationMs)
         assertTrue(events.any { it is PipelineEvent.Progress && it.stage == Stage.DIARIZATION && it.fraction == 0.4f })
-        assertEquals(listOf("vad", "diar", "asr", "llm"), opened)
-        assertEquals(listOf("vad", "diar", "asr", "llm"), closed)
+        assertEquals(listOf("vad", "diar", "asr"), opened)
+        assertEquals(listOf("vad", "diar", "asr"), closed)
     }
 
     @Test
-    fun `метки ASR учитывают паддинг и ограничиваются сегментом`() = runTest {
+    fun `анализ после расшифровки — итоги, имена из самопредставления, движок закрыт`() = runTest {
+        val t = Transcript(listOf(Utterance("speaker_2", 0, 1000, "Я Лёша, привет."), Utterance("speaker_1", 1200, 2000, "Привет.")))
+        val a = pipeline().analyze(t, PipelineConfig())!!
+        assertEquals("протокол", a.protocol)
+        assertEquals(mapOf("speaker_2" to "Лёша"), a.roles)
+        assertNull(a.corrected)
+        assertEquals(listOf("llm"), opened)
+        assertEquals(listOf("llm"), closed)
+    }
+
+    @Test
+    fun `границы реплик — по участкам VAD, метки токенов их не обрезают`() = runTest {
         // Пауза VAD сохраняет три отдельных фрагмента после повторной разметки спикеров.
         val separatedVad = VadFactory {
             object : VoiceActivityDetector {
@@ -146,7 +159,7 @@ class DefaultTranscriptionPipelineTest {
             .run("x", PipelineConfig(mergeGapMs = 0, segmentPaddingMs = 150)).toList().last() as PipelineEvent.Completed
         assertEquals(3, index)
         assertEquals(
-            listOf(300L to 2000L, 2300L to 4000L, 5200L to 6050L),
+            listOf(0L to 2000L, 2300L to 4000L, 5000L to 9000L),
             result.result.transcript.transcript.map { it.startMs to it.endMs },
         )
     }
@@ -169,28 +182,23 @@ class DefaultTranscriptionPipelineTest {
     @Test
     fun `сбой LLM не валит обработку`() = runTest {
         val broken = LlmEngineFactory { throw NotImplementedError("TODO(роль 4)") }
-        val events = pipeline(llmFactory = broken).run("x", PipelineConfig()).toList()
-        val r = (events.last() as PipelineEvent.Completed).result
-        assertTrue(r.protocol!!.startsWith("Протокол не составлен"))
-        assertEquals(2, r.transcript.transcript.size)
+        val t = Transcript(listOf(Utterance("speaker_1", 0, 1000, "Я Нюта.")))
+        val a = pipeline(llmFactory = broken).analyze(t, PipelineConfig())!!
+        assertTrue(a.protocol!!.startsWith("Итоги не составлены"))
+        assertEquals(mapOf("speaker_1" to "Нюта"), a.roles) // имена — без LLM, работают и при её сбое
     }
 
     @Test
-    fun `расшифровка отдаётся до LLM, чтобы её успели сохранить`() = runTest {
-        val events = pipeline().run("x", PipelineConfig()).toList()
-        val ready = events.indexOfFirst { it is PipelineEvent.TranscriptReady }
-        val llmStart = events.indexOfFirst { it is PipelineEvent.Progress && it.stage == Stage.LLM }
-        assertTrue("TranscriptReady должен прийти до этапа LLM", ready in 0 until llmStart)
-        val draft = (events[ready] as PipelineEvent.TranscriptReady).result
-        assertEquals(2, draft.transcript.transcript.size)
-        assertNull(draft.protocol)
-    }
-
-    @Test
-    fun `LLM выключена — движок не создаётся`() = runTest {
-        val r = pipeline().run("x", PipelineConfig(enableLlmProtocol = false, enableLlmCorrection = false)).toList().last()
-        assertNotNull((r as PipelineEvent.Completed).result)
+    fun `LLM выключена или расшифровка пустая — анализа нет, движок не создаётся`() = runTest {
+        val t = Transcript(listOf(Utterance("speaker_1", 0, 1000, "Привет.")))
+        assertNull(pipeline().analyze(t, PipelineConfig(enableLlmProtocol = false, enableLlmCorrection = false)))
+        assertNull(pipeline().analyze(Transcript(emptyList()), PipelineConfig()))
         assertTrue("llm" !in opened)
-        assertNull(r.result.protocol)
+    }
+
+    @Test
+    fun `RTF без LLM — анализ идёт после показа результата`() {
+        val r = TranscriptionResult(Transcript(emptyList()), null, null, emptyMap(), mapOf(Stage.ASR to 500L, Stage.LLM to 9000L), 1000)
+        assertEquals(0.5, r.rtf, 1e-9)
     }
 }

@@ -41,7 +41,8 @@ export const ru = {
   processing: {
     title: 'Обработка',
     speakers: 'Число спикеров',
-    llmProtocol: 'Протокол заседания (LLM)',
+    llmProtocol: 'Итоги разговора (LLM)',
+    llmProtocolHint: 'Появятся после расшифровки — её можно читать сразу.',
     llmCorrection: 'Правка текста LLM (экспериментально)',
     llmCorrectionHint: 'Сырой текст ASR остаётся основой экспорта.',
     start: 'Начать обработку',
@@ -66,8 +67,11 @@ export const ru = {
   transcript: {
     title: 'Расшифровка',
     tabTranscript: 'Расшифровка',
-    tabProtocol: 'Протокол',
-    noProtocol: 'Протокол не строился. Включите «Протокол заседания» перед обработкой.',
+    tabProtocol: 'Итоги',
+    noProtocol: 'Итоги не строились. Включите «Итоги разговора» перед обработкой.',
+    analysisPending:
+      'LLM готовит итоги и имена спикеров — это пара минут. Расшифровку уже можно читать и править.',
+    analysisPendingShort: 'Готовим итоги…',
     editText: 'Изменить текст',
     changeSpeaker: 'Сменить спикера',
     renameSpeakers: 'Переименовать спикеров',

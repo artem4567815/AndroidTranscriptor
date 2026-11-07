@@ -42,6 +42,51 @@ class ResamplerTest {
         assertTrue("rms=${rms(out, 500, out.size - 500)}", rms(out, 500, out.size - 500) < 0.02)
     }
 
+    /** Прежняя реализация «целиком» (до потоковой) — эталон: потоковая должна давать то же самое. */
+    private fun reference(input: FloatArray, fromRate: Int, toRate: Int): FloatArray {
+        val ratio = toRate.toDouble() / fromRate
+        val out = FloatArray(kotlin.math.floor(input.size * ratio).toInt().coerceAtLeast(1))
+        val cutoff = kotlin.math.min(1.0, ratio) * 0.97
+        val hw = 16 / cutoff
+        for (i in out.indices) {
+            val center = i / ratio
+            var acc = 0.0
+            var norm = 0.0
+            for (j in kotlin.math.max(0, (center - hw).toInt())..kotlin.math.min(input.size - 1, (center + hw).toInt() + 1)) {
+                val x = j - center
+                if (x <= -hw || x >= hw) continue
+                val sinc = if (x == 0.0) 1.0 else sin(PI * cutoff * x) / (PI * cutoff * x)
+                val w = sinc * 0.5 * (1 + kotlin.math.cos(PI * x / hw))
+                acc += input[j] * w
+                norm += w
+            }
+            out[i] = if (norm > 1e-9) (acc / norm).toFloat() else 0f
+        }
+        return out
+    }
+
+    @Test
+    fun `потоковый пересчёт совпадает с прежним sinc-фильтром`() {
+        val rnd = java.util.Random(1)
+        for (from in listOf(44_100, 48_000, 22_050, 8_000, 32_000)) {
+            val input = FloatArray(from / 2 + 37) { (rnd.nextGaussian() * 0.3).toFloat() }
+            val expected = reference(input, from, 16_000)
+            val actual = Resampler.resample(input, from, 16_000)
+            assertEquals("длина при $from Гц", expected.size, actual.size)
+            var maxErr = 0f
+            for (i in expected.indices) maxErr = maxOf(maxErr, abs(expected[i] - actual[i]))
+            assertTrue("$from Гц: maxErr=$maxErr", maxErr < 1e-4f)
+        }
+    }
+
+    @Test
+    fun `потоковый пересчёт держит в памяти только окно`() {
+        val r = StreamingResampler(48_000, 16_000)
+        repeat(48_000 * 60) { r.add(if (it % 2 == 0) 0.1f else -0.1f) } // минута
+        assertTrue("буфер ${r.bufferedInputCapacity}", r.bufferedInputCapacity <= 8192)
+        assertEquals(16_000 * 60, r.finish().size)
+    }
+
     @Test
     fun `та же частота — копия`() {
         val a = floatArrayOf(0.1f, 0.2f)
