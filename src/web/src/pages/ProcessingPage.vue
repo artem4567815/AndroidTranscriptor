@@ -25,6 +25,7 @@ import { useProcessingStore } from '@/stores/processing'
 import { useRecordingsStore } from '@/stores/recordings'
 import { useSettingsStore } from '@/stores/settings'
 import { ru } from '@/i18n/ru'
+import type { Stage } from '@/native'
 import { formatMs } from '@/utils/time'
 
 const props = defineProps<{ id: string }>()
@@ -32,14 +33,31 @@ const router = useRouter()
 const processing = useProcessingStore()
 const recordings = useRecordingsStore()
 const settings = useSettingsStore()
-const { running, completed, failure, stages, currentStage, elapsedMs, recordingId } =
-  storeToRefs(processing)
+const {
+  running,
+  completed,
+  failure,
+  stages,
+  currentStage,
+  elapsedMs,
+  recordingId,
+  cancelRequested,
+} = storeToRefs(processing)
 const { numSpeakers, enableLlmProtocol, enableLlmCorrection } = storeToRefs(settings)
 
 const recording = computed(() => recordings.byId(props.id))
 const isThis = computed(() => recordingId.value === props.id)
 const showForm = computed(() => !isThis.value || (!running.value && !completed.value))
 const speakerOptions = [0, 2, 3, 4, 5, 6]
+
+/** Этапы, которые нативный код не умеет прерывать на середине. */
+const UNINTERRUPTIBLE: readonly Stage[] = ['DIARIZATION']
+const cancelText = computed(() => {
+  const stage = currentStage.value
+  return stage && UNINTERRUPTIBLE.includes(stage)
+    ? ru.processing.cancelAfterStage(ru.stages[stage])
+    : ru.processing.cancelling
+})
 
 onMounted(async () => {
   await processing.ensureListeners()
@@ -115,10 +133,14 @@ function start() {
             v-if="running && isThis"
             expand="block"
             color="medium"
+            :disabled="cancelRequested"
             @click="processing.cancel()"
           >
             {{ ru.common.cancel }}
           </ion-button>
+          <ion-text v-if="running && isThis && cancelRequested" color="medium">
+            <p class="ion-text-center">{{ cancelText }}</p>
+          </ion-text>
           <ion-button v-else-if="!running" expand="block" @click="start">
             {{ failure && isThis ? ru.common.retry : ru.processing.start }}
           </ion-button>

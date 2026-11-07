@@ -4,8 +4,8 @@
     {
       "id": "asr.encoder",
       "path": "asr/encoder.int8.onnx",
-      "sizeBytes": 0,
-      "sha256": "",
+      "sizeBytes": 224570820,
+      "sha256": "369f35a71bf288d3b8e0391fabd8dba5f2314088d440bca474056b7b4b6e66bf",
       "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-transducer-punct-giga-am-v3-russian-2025-12-16.tar.bz2",
       "license": "MIT",
       "purpose": "ASR: GigaAM v3 e2e (транcдьюсер с пунктуацией), энкодер int8",
@@ -15,8 +15,8 @@
     {
       "id": "asr.decoder",
       "path": "asr/decoder.onnx",
-      "sizeBytes": 0,
-      "sha256": "",
+      "sizeBytes": 4600132,
+      "sha256": "38fc7475443ea2a26f63211ca350f73ac50fff824ab7a3876ee2bd610c53bbc4",
       "source": "см. asr.encoder",
       "license": "MIT",
       "purpose": "ASR: GigaAM v3 e2e, декодер",
@@ -26,8 +26,8 @@
     {
       "id": "asr.joiner",
       "path": "asr/joiner.onnx",
-      "sizeBytes": 0,
-      "sha256": "",
+      "sizeBytes": 2712896,
+      "sha256": "602ff7017a93311aad34df1437c8d7f49911353c13d6eae7a6ee7b041339465c",
       "source": "см. asr.encoder",
       "license": "MIT",
       "purpose": "ASR: GigaAM v3 e2e, joiner",
@@ -37,8 +37,8 @@
     {
       "id": "asr.tokens",
       "path": "asr/tokens.txt",
-      "sizeBytes": 0,
-      "sha256": "",
+      "sizeBytes": 13354,
+      "sha256": "39abae20e692998290c574e606f11a9edef2902a1995463fcff63d1490cf22b7",
       "source": "см. asr.encoder",
       "license": "MIT",
       "purpose": "ASR: словарь токенов",
@@ -59,8 +59,8 @@
     {
       "id": "diarization.segmentation",
       "path": "diarization/segmentation.onnx",
-      "sizeBytes": 0,
-      "sha256": "",
+      "sizeBytes": 1540506,
+      "sha256": "d582f4b4c6b48205de7e0643c57df0df5615a3c176189be3fc461e9d18827b5d",
       "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
       "license": "MIT",
       "purpose": "Диаризация: pyannote-segmentation-3.0",
@@ -70,12 +70,12 @@
     {
       "id": "diarization.embedding",
       "path": "diarization/embedding.onnx",
-      "sizeBytes": 28281138,
-      "sha256": "",
-      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx",
+      "sizeBytes": 29596978,
+      "sha256": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+      "source": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
       "license": "Apache-2.0",
-      "purpose": "Диаризация: эмбеддинги спикеров 3D-Speaker CAM++",
-      "version": "16k-common",
+      "purpose": "Диаризация: отпечатки голоса 3D-Speaker CAM++ (VoxCeleb)",
+      "version": "campplus_sv_en_voxceleb_16k",
       "required": true
     },
     {

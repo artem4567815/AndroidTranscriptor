@@ -68,6 +68,7 @@ class DefaultTranscriptionPipeline(
             audio = step(Stage.PREPROCESS) { preprocessor.process(audio) }
 
             val speech = step(Stage.VAD) { vadFactory.create(config).use { it.detect(audio) } }
+            log("vad: regions=${speech.size} speechMs=${speech.sumOf { it.endMs - it.startMs }}")
 
             val speakers = step(Stage.DIARIZATION) {
                 val found = diarizerFactory.create(config).use { d ->
@@ -75,6 +76,7 @@ class DefaultTranscriptionPipeline(
                 }
                 found.ifEmpty { SegmentPlanner.fallbackSegments(speech) }
             }
+            log("diarization: segments=${speakers.size} speakers=${speakers.map { it.speaker }.distinct().size}")
 
             val texts = step(Stage.ASR) {
                 val chunks = SegmentPlanner.plan(speakers, speech, config, audio.durationMs)
