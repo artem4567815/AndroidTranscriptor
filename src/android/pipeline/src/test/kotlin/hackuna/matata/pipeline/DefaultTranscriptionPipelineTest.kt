@@ -7,6 +7,7 @@ import hackuna.matata.core.model.DiarizerFactory
 import hackuna.matata.core.model.ErrorCode
 import hackuna.matata.core.model.LlmEngine
 import hackuna.matata.core.model.LlmEngineFactory
+import hackuna.matata.core.model.MeetingProtocol
 import hackuna.matata.core.model.PcmAudio
 import hackuna.matata.core.model.PipelineConfig
 import hackuna.matata.core.model.PipelineEvent
@@ -72,14 +73,13 @@ class DefaultTranscriptionPipelineTest {
     private val llm = LlmEngineFactory {
         opened += "llm"
         object : LlmEngine {
-            override suspend fun generate(prompt: String, maxTokens: Int) = ""
+            override suspend fun generate(prompt: String, maxTokens: Int, system: String?) = ""
             override fun close() { closed += "llm" }
         }
     }
     private val pp = PostProcessorFactory {
         object : TranscriptPostProcessor {
-            override suspend fun protocol(t: Transcript) = "протокол"
-            override suspend fun speakerRoles(t: Transcript) = mapOf("speaker_1" to "Председатель")
+            override suspend fun protocol(t: Transcript) = MeetingProtocol("протокол", mapOf("speaker_1" to "Председатель"))
             override suspend fun correct(t: Transcript) = t
         }
     }
@@ -129,9 +129,21 @@ class DefaultTranscriptionPipelineTest {
     @Test
     fun `сбой LLM не валит обработку`() = runTest {
         val broken = LlmEngineFactory { throw NotImplementedError("TODO(роль 4)") }
-        val r = (pipeline(llmFactory = broken).run("x", PipelineConfig()).toList().last() as PipelineEvent.Completed).result
-        assertNull(r.protocol)
+        val events = pipeline(llmFactory = broken).run("x", PipelineConfig()).toList()
+        val r = (events.last() as PipelineEvent.Completed).result
+        assertTrue(r.protocol!!.startsWith("Протокол не составлен"))
         assertEquals(2, r.transcript.transcript.size)
+    }
+
+    @Test
+    fun `расшифровка отдаётся до LLM, чтобы её успели сохранить`() = runTest {
+        val events = pipeline().run("x", PipelineConfig()).toList()
+        val ready = events.indexOfFirst { it is PipelineEvent.TranscriptReady }
+        val llmStart = events.indexOfFirst { it is PipelineEvent.Progress && it.stage == Stage.LLM }
+        assertTrue("TranscriptReady должен прийти до этапа LLM", ready in 0 until llmStart)
+        val draft = (events[ready] as PipelineEvent.TranscriptReady).result
+        assertEquals(2, draft.transcript.transcript.size)
+        assertNull(draft.protocol)
     }
 
     @Test
@@ -139,5 +151,6 @@ class DefaultTranscriptionPipelineTest {
         val r = pipeline().run("x", PipelineConfig(enableLlmProtocol = false, enableLlmCorrection = false)).toList().last()
         assertNotNull((r as PipelineEvent.Completed).result)
         assertTrue("llm" !in opened)
+        assertNull(r.result.protocol)
     }
 }

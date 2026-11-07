@@ -20,7 +20,7 @@ cd src/web && npm install && npm run dev
 
 # 2. Нативные библиотеки и модели (для разработчиков, нужен интернет)
 scripts/fetch_sherpa.sh
-scripts/download_models.sh
+scripts/download_models.sh --with-llm   # без флага — без протокола (LLM 977 МБ)
 
 # 3. Сборка Vue → Android
 cd src/web && npm run build && npx cap sync android

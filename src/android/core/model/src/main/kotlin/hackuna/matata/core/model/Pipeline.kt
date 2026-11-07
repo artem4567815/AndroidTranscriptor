@@ -56,6 +56,11 @@ data class TranscriptionResult(
 sealed interface PipelineEvent {
     data class Progress(val stage: Stage, val fraction: Float) : PipelineEvent
     data class StageDone(val stage: Stage, val millis: Long) : PipelineEvent
+    /**
+     * Расшифровка готова, дальше идёт долгий и тяжёлый по памяти этап LLM. Контроллер сохраняет
+     * её сразу: если систему убьют за нехватку памяти во время LLM, расшифровка не потеряется.
+     */
+    data class TranscriptReady(val result: TranscriptionResult) : PipelineEvent
     data class Completed(val result: TranscriptionResult) : PipelineEvent
     data class Failed(val stage: Stage, val error: Throwable) : PipelineEvent
 }
@@ -91,12 +96,18 @@ interface SpeechRecognizer : Closeable {
 }
 
 interface LlmEngine : Closeable {
-    suspend fun generate(prompt: String, maxTokens: Int): String
+    /** [system] — инструкция модели (системное сообщение), [prompt] — сам запрос с данными. */
+    suspend fun generate(prompt: String, maxTokens: Int, system: String? = null): String
 }
 
+/**
+ * Протокол и роли участников (speaker_N → «Ведущий»). Получаются ОДНИМ запросом к LLM:
+ * модель читает расшифровку один раз — это самая долгая часть генерации на телефоне.
+ */
+data class MeetingProtocol(val text: String, val roles: Map<String, String>)
+
 interface TranscriptPostProcessor {
-    suspend fun protocol(t: Transcript): String
-    suspend fun speakerRoles(t: Transcript): Map<String, String>
+    suspend fun protocol(t: Transcript): MeetingProtocol
     suspend fun correct(t: Transcript): Transcript
 }
 

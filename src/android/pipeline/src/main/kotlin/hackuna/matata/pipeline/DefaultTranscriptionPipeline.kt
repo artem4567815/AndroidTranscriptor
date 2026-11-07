@@ -12,6 +12,7 @@ import hackuna.matata.core.model.PostProcessorFactory
 import hackuna.matata.core.model.SpeakerText
 import hackuna.matata.core.model.SpeechRecognizerFactory
 import hackuna.matata.core.model.Stage
+import hackuna.matata.core.model.StenoException
 import hackuna.matata.core.model.Transcript
 import hackuna.matata.core.model.TranscriptionPipeline
 import hackuna.matata.core.model.TranscriptionResult
@@ -96,18 +97,25 @@ class DefaultTranscriptionPipeline(
             }
 
             val transcript = step(Stage.MERGE) { UtteranceMerger.merge(texts, config) }
+            val asrOnly = TranscriptionResult(
+                transcript = transcript,
+                llmCorrected = null,
+                protocol = null,
+                speakerNames = emptyMap(),
+                timings = timings.toMap(),
+                audioDurationMs = audio.durationMs,
+            )
+            if (wantsLlm(transcript, config)) send(PipelineEvent.TranscriptReady(asrOnly))
 
             val llm = step(Stage.LLM) { runLlm(transcript, config) }
 
             send(
                 PipelineEvent.Completed(
-                    TranscriptionResult(
-                        transcript = transcript,
+                    asrOnly.copy(
                         llmCorrected = llm.corrected,
                         protocol = llm.protocol,
                         speakerNames = llm.roles,
                         timings = timings.toMap(),
-                        audioDurationMs = audio.durationMs,
                     ),
                 ),
             )
@@ -121,17 +129,22 @@ class DefaultTranscriptionPipeline(
 
     private data class LlmOutput(val protocol: String?, val roles: Map<String, String>, val corrected: Transcript?)
 
-    /** LLM — необязательный этап: его сбой не валит обработку, сырой ASR остаётся. */
+    private fun wantsLlm(t: Transcript, config: PipelineConfig) =
+        t.transcript.isNotEmpty() && (config.enableLlmProtocol || config.enableLlmCorrection)
+
+    /**
+     * LLM — необязательный этап: его сбой не валит обработку, сырой ASR остаётся.
+     * Если протокол просили, но он не получился, вместо него — короткое объяснение для вкладки «Протокол».
+     */
     private suspend fun runLlm(t: Transcript, config: PipelineConfig): LlmOutput {
-        if (t.transcript.isEmpty() || (!config.enableLlmProtocol && !config.enableLlmCorrection)) {
-            return LlmOutput(null, emptyMap(), null)
-        }
+        if (!wantsLlm(t, config)) return LlmOutput(null, emptyMap(), null)
         return try {
             llmFactory.create(config).use { engine ->
                 val pp = postProcessorFactory.create(engine)
+                val protocol = if (config.enableLlmProtocol) pp.protocol(t) else null
                 LlmOutput(
-                    protocol = if (config.enableLlmProtocol) pp.protocol(t) else null,
-                    roles = if (config.enableLlmProtocol) pp.speakerRoles(t) else emptyMap(),
+                    protocol = protocol?.text?.takeIf { it.isNotBlank() },
+                    roles = protocol?.roles.orEmpty(),
                     corrected = if (config.enableLlmCorrection) pp.correct(t) else null,
                 )
             }
@@ -139,7 +152,8 @@ class DefaultTranscriptionPipeline(
             throw e
         } catch (e: Throwable) {
             log("LLM skipped: $e")
-            LlmOutput(null, emptyMap(), null)
+            val reason = if (e is StenoException) e.message else "ошибка модели (${e.message ?: e.javaClass.simpleName})"
+            LlmOutput(if (config.enableLlmProtocol) "Протокол не составлен: $reason" else null, emptyMap(), null)
         }
     }
 

@@ -81,12 +81,12 @@
     {
       "id": "llm",
       "path": "llm/model.litertlm",
-      "sizeBytes": 0,
-      "sha256": "",
-      "source": "TODO(роль 4): https://huggingface.co/litert-community — выбрать Gemma 4 E2B или Qwen2.5-0.5B в формате .litertlm",
-      "license": "см. карточку модели",
-      "purpose": "LLM: протокол, роли спикеров, правка текста (опционально)",
-      "version": "",
+      "sizeBytes": 977184032,
+      "sha256": "2a72330b504a6596d53a2c00923c57173b10f1b83e6a541213ffec08d1fc5de8",
+      "source": "https://huggingface.co/litert-community/Qwen3-1.7B/resolve/main/Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm",
+      "license": "Apache-2.0",
+      "purpose": "LLM: протокол и роли участников, правка текста (опционально). Qwen3-1.7B, веса int4",
+      "version": "Qwen3-1.7B_dynamic_wi4b32_afp32",
       "required": false
     }
   ]
