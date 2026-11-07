@@ -316,6 +316,26 @@ export function createStenoMock(): StenoMock {
       }
       return { ready: true }
     },
+    async getPipelineDefaults() {
+      // Копия PipelineConfig() из Kotlin — только для браузерного мока.
+      return {
+        numSpeakers: 0,
+        clusterThreshold: 0.5,
+        mergeGapMs: 700,
+        maxSegmentMs: 20000,
+        segmentPaddingMs: 150,
+        minUtteranceMs: 200,
+        numThreads: 4,
+        enableDenoise: false,
+        enableLlmProtocol: true,
+        enableLlmCorrection: false,
+        vadThreshold: 0.5,
+        diarizationWindowShift: 0.1,
+        regroupSpeakers: true,
+        embeddingPaddingMs: 200,
+        minSpeakerSilhouette: 0.1,
+      }
+    },
     async getModelsInfo() {
       return { items: structuredClone(MODELS) }
     },

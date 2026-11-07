@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useModelsStore } from '@/stores/models'
 import { ru } from '@/i18n/ru'
 
-const models = useModelsStore()
+// reactive() разворачивает ref внутри объекта: в шаблоне models.error / models.fraction — значения, а не ref.
+const models = reactive(useModelsStore())
 const route = useRoute()
 const router = useRouter()
 async function run() {

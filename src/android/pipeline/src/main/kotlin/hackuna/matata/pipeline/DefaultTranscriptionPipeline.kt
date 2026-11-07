@@ -71,10 +71,15 @@ class DefaultTranscriptionPipeline(
             log("vad: regions=${speech.size} speechMs=${speech.sumOf { it.endMs - it.startMs }}")
 
             val speakers = step(Stage.DIARIZATION) {
-                val found = diarizerFactory.create(config).use { d ->
-                    d.diarize(audio, config) { f -> trySend(PipelineEvent.Progress(Stage.DIARIZATION, f.coerceIn(0f, 1f))) }
-                }
-                found.ifEmpty { SegmentPlanner.fallbackSegments(speech) }
+                diarizerFactory.create(config).use { d ->
+                    val found = d.diarize(audio, config) { f ->
+                        trySend(PipelineEvent.Progress(Stage.DIARIZATION, (f * 0.8f).coerceIn(0f, 0.8f)))
+                    }
+                    // Участки речи (VAD, разрезанные по сменам спикера из первого прохода) + второй проход.
+                    val units = SegmentPlanner.speechUnits(speech, found)
+                    val labels = if (config.regroupSpeakers && units.size >= 2) d.labelUnits(audio, units, config) else null
+                    if (units.isEmpty()) found else SegmentPlanner.labelUnits(units, labels, found)
+                }.ifEmpty { SegmentPlanner.fallbackSegments(speech) }
             }
             log("diarization: segments=${speakers.size} speakers=${speakers.map { it.speaker }.distinct().size}")
 

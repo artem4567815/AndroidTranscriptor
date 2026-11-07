@@ -16,6 +16,7 @@ let pluginPromise: Promise<StenoPlugin> | null = null
 const METHODS: Record<keyof StenoPlugin, true> = {
   prepareModels: true,
   getModelsInfo: true,
+  getPipelineDefaults: true,
   listRecordings: true,
   importAudio: true,
   startRecording: true,

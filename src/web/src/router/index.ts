@@ -35,7 +35,8 @@ router.beforeEach((to, from) => {
 // Пока модели не подготовлены, все пути ведут на страницу первого запуска.
 router.beforeEach((to) => {
   const models = useModelsStore()
-  if (!models.ready && to.name !== 'setup') {
+  // ready — это ref: проверяем .value, иначе объект ref всегда «истинный» и экран моделей не откроется.
+  if (!models.ready.value && to.name !== 'setup') {
     return { name: 'setup', query: { next: to.fullPath } }
   }
 })
