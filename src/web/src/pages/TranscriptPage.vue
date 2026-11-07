@@ -8,6 +8,7 @@ import { playableSrc, type ExportFormat } from '@/native'
 import { ru } from '@/i18n/ru'
 import ToastMessage from '@/components/ToastMessage.vue'
 import DownloadDialog from '@/components/DownloadDialog.vue'
+import RecordingDetailsDialog from '@/components/RecordingDetailsDialog.vue'
 
 const props = defineProps<{ id: string }>()
 const store = useTranscriptStore()
@@ -19,6 +20,7 @@ const seekToMs = ref<number | null>(null)
 const toastOpen = ref(false)
 const downloadOpen = ref(false)
 const isPlaying = ref(false)
+const detailsOpen = ref(false)
 onMounted(async () => {
   if (!recordings.items.value.length) await recordings.refresh()
   await store.load(props.id)
@@ -81,13 +83,21 @@ function downloadJson() {
   downloadOpen.value = false
   void exportAs('json')
 }
+async function saveDetails(title: string, names: Record<string, string>) {
+  recordings.rename(props.id, title)
+  await Promise.all(
+    Object.entries(names).map(([speakerId, name]) => store.renameSpeaker(speakerId, name)),
+  )
+  detailsOpen.value = false
+}
 </script>
 
 <template>
   <div class="page transcript-page">
     <header class="topbar compact">
       <RouterLink class="back-button" to="/library">‹</RouterLink
-      ><span class="topbar-title">{{ recording?.title ?? ru.transcript.title }}</span
+      ><button class="topbar-title title-button" @click="detailsOpen = true">
+        {{ recording?.title ?? ru.transcript.title }}</button
       ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
@@ -148,6 +158,14 @@ function downloadJson() {
       @json="downloadJson"
       @cancel="downloadOpen = false"
     />
+    <RecordingDetailsDialog
+      :open="detailsOpen"
+      :title="recording?.title ?? ru.transcript.title"
+      :speaker-ids="store.speakerIds.value"
+      :names="store.speakerNames.value"
+      @save="saveDetails"
+      @cancel="detailsOpen = false"
+    />
   </div>
 </template>
 
@@ -164,6 +182,18 @@ function downloadJson() {
   border: 1px solid var(--app-border);
   border-radius: 15px;
   background: var(--app-surface);
+}
+.title-button {
+  width: min(70%, 360px);
+  overflow: hidden;
+  padding: 0 8px;
+  border: 0;
+  color: var(--app-ink);
+  background: transparent;
+  font-size: 17px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tabs button {
   padding: 11px;
