@@ -31,7 +31,7 @@
 | `ml/sherpa` | `…ml.sherpa` | `.so` + официальные Kotlin API sherpa-onnx (пакет `com.k2fsa.sherpa.onnx`) | роль 2 |
 | `ml/asr` | `…ml.asr` | `GigaAmSpeechRecognizer` (заглушка) | роль 2 |
 | `ml/diarization` | `…ml.diarization` | `SileroVoiceActivityDetector`, `SherpaDiarizer` (заглушки) | роль 3 |
-| `ml/llm` | `…ml.llm` | `LiteRtLmEngine` (Qwen3-1.7B на LiteRT-LM), `LlmTranscriptPostProcessor` (промпт итогов, правка), `LlmMemoryGuard`, `LlmWeightCache` | роль 4 |
+| `ml/llm` | `…ml.llm` | `LiteRtLmEngine` (Qwen3-1.7B на LiteRT-LM), `LlmTranscriptPostProcessor` (промпт итогов, правка), `SummaryAttribution` (сверка «кто что сказал»), `LlmMemoryGuard`, `LlmWeightCache` | роль 4 |
 | `pipeline` | `…pipeline` | `DefaultTranscriptionPipeline`, `SegmentPlanner`, `UtteranceMerger` | роль 3 |
 
 **Правила зависимостей:** `core/model` ни от чего не зависит (кроме kotlinx.serialization и coroutines);
