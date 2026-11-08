@@ -15,15 +15,15 @@ class LlmTranscriptPostProcessor(
     private val engine: LlmEngine,
     /**
      * Сколько символов расшифровки отдаём модели. Контекст Qwen3 в приложении — 4096 токенов,
-     * русский текст ≈ 3 символа на токен: 9000 символов ≈ 3000 токенов + инструкция ≈ 200 + ответ ≤ 320.
+     * русский текст ≈ 3 символа на токен: 8500 символов ≈ 2850 токенов + инструкция ≈ 300 + ответ ≤ 640.
      */
-    private val maxContextChars: Int = 9_000,
+    private val maxContextChars: Int = 8_500,
 ) : TranscriptPostProcessor {
 
     override suspend fun protocol(t: Transcript): String {
         val r = render(t)
         val answer = engine.generate(Prompts.summaryRequest(r.text), SUMMARY_TOKENS, Prompts.SUMMARY_SYSTEM)
-        val text = Prompts.cleanSummary(answer)
+        val text = SummaryAttribution.fix(Prompts.cleanSummary(answer, t), t)
         if (text.isEmpty() || r.truncatedAtMs == null) return text
         val minutes = (r.truncatedAtMs + 59_999) / 60_000
         return "$text\n\n(Итоги по первым $minutes мин записи: вся расшифровка не помещается в память модели.)"
@@ -59,8 +59,8 @@ class LlmTranscriptPostProcessor(
     }
 
     private companion object {
-        /** Итоги — 3–5 предложений (~40–120 токенов на тестовых записях); запас, чтобы не обрезать. */
-        const val SUMMARY_TOKENS = 320
+        /** Изложение — 100–160 слов (~200–350 токенов на тестовых записях); запас, чтобы не обрезать. */
+        const val SUMMARY_TOKENS = 640
     }
 }
 
@@ -68,37 +68,72 @@ class LlmTranscriptPostProcessor(
  * Промпты подобраны на Qwen3-1.7B (docs/MODELS.md, замеры в docs/TESTS.md):
  *  - правила — в системном сообщении, расшифровка — отдельно: иначе маленькая модель
  *    начинает переписывать расшифровку в ответ;
- *  - одна простая задача — пересказ своими словами. Жёсткий шаблон («Тема / Обсуждали / Решения»)
- *    на играх и бытовых разговорах давал кривые итоги, а варианты «если встреча — так, если игра — так»
- *    модель 1,7B выполняет все сразу. Роли участников она путает и копирует примеры из промпта —
- *    поэтому их не просим (имена берутся из самопредставлений, pipeline/SpeakerNames).
+ *  - полужёсткая форма «О чём разговор» + «Главное» (4–8 пунктов): при полной свободе модель
+ *    сжимала итоги до 1–3 предложений, а жёсткий шаблон «Тема/Решения/Поручения» ломался на играх;
+ *  - пункты — о содержании, участников не называть (кроме поручений): иначе модель приписывает
+ *    ведущему рассказ гостя («Леша поделился хобби»), хотя он только спрашивал. Справка «кто сколько говорит»
+ *    и имена в расшифровке делали хуже — модель придумывала реплики для каждого участника.
  */
 internal object Prompts {
     val SUMMARY_SYSTEM = """
-        Ты пишешь короткое содержание разговора по его расшифровке. Участники в расшифровке обозначены speaker_1, speaker_2 и так далее.
+        Ты составляешь краткое изложение разговора по его расшифровке.
 
-        Напиши от трёх до пяти предложений своими словами: о чём был разговор и что в нём главное. Если были решения или договорённости — кто, что и к какому сроку — обязательно упомяни их. Если это игра или шутливая болтовня — так и скажи. Пиши обычным текстом, без списков и без Markdown. Не придумывай того, чего нет в расшифровке.
+        Ответ дай в таком виде:
+        О чём разговор: одно-два предложения.
+        Главное:
+        - от четырёх до восьми пунктов, в каждом одно-два предложения своими словами: конкретные факты, истории, мысли, решения и договорённости из расшифровки.
+
+        Правила:
+        - Пиши о содержании, а не о том, кто что сказал. Участников не называй. Исключение — решения и поручения: в них пиши, кто, что и к какому сроку сделает.
+        - Пиши своими словами. Не цитируй и не переписывай реплики из расшифровки, не пересказывай их по очереди.
+        - Если это игра или шутливая болтовня, так и напиши, а в пунктах — что происходило.
+        - Обычный текст, без звёздочек и решёток. Ничего не придумывай: только то, что есть в расшифровке.
     """.trimIndent()
 
-    fun summaryRequest(transcript: String) = "Расшифровка:\n${transcript}Кратко перескажи этот разговор."
+    fun summaryRequest(transcript: String) = "Расшифровка:\n${transcript}Составь изложение этого разговора."
 
     val CORRECT_SYSTEM = """
         Исправь в тексте только явные ошибки распознавания речи, пунктуацию и регистр.
         Не меняй смысл, не добавляй и не удаляй слова без необходимости. Верни только исправленный текст.
     """.trimIndent()
 
-    /** Убирает остатки Markdown и «эхо» расшифровки, если модель всё же начала её повторять. */
-    fun cleanSummary(answer: String): String {
+    /** Строка-цитата из расшифровки: «speaker_2: реплика» (с маркером списка или без). */
+    private val quotedLine = Regex("""^\s*[-–—•*]?\s*speaker_\d+\s*:\s""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Приводит ответ модели в порядок:
+     *  - убирает Markdown и «эхо» расшифровки (заголовок «Расшифровка:» и всё после него);
+     *  - выбрасывает строки-цитаты реплик и почти одинаковые пункты (модель 1,7B иногда повторяется);
+     *  - «Сpeaker_1» с кириллической «С» → «speaker_1», чтобы интерфейс подставил имя.
+     */
+    fun cleanSummary(answer: String, transcript: Transcript? = null): String {
         val echo = Regex("""(?imu)^\s*<?расшифровка>?\s*:?\s*$""").find(answer)?.range?.first ?: answer.length
+        val utterances = transcript?.transcript.orEmpty().map { words(it.text) }.filter { it.size >= 2 }.toSet()
+        val seen = mutableListOf<Set<String>>()
         return answer.substring(0, echo)
             .replace("**", "").replace("__", "")
+            .replace(Regex("""[СсCc]peaker_(\d+)"""), "speaker_$1")
             .lineSequence()
             .map { it.replace(Regex("""^\s*#+\s*"""), "").trimEnd() }
             .filterNot { it.isNotEmpty() && it.all { c -> c in "-—–=_*" } }
+            .filterNot { quotedLine.containsMatchIn(it) }
+            .filter { line ->
+                val w = words(line)
+                if (w.size < 3) return@filter true
+                val duplicate = seen.any { jaccard(it, w) >= 0.8 } || w in utterances
+                if (!duplicate) seen += w
+                !duplicate
+            }
             .joinToString("\n")
             .replace(Regex("""\n{3,}"""), "\n\n")
             .trim()
     }
+
+    private fun words(text: String): Set<String> =
+        text.lowercase().split(Regex("""[^\p{L}\p{N}]+""")).filter { it.isNotEmpty() }.toSet()
+
+    private fun jaccard(a: Set<String>, b: Set<String>): Double =
+        if (a.isEmpty() && b.isEmpty()) 1.0 else (a intersect b).size.toDouble() / (a union b).size
 
     /**
      * Защита от «галлюцинаций»: правку принимаем, только если длина изменилась не сильно.
