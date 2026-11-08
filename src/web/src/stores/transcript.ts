@@ -108,7 +108,7 @@ async function renameSpeaker(speakerId: string, name: string) {
   r.speakerNames = { ...r.speakerNames, [speakerId]: name }
 }
 
-async function exportAs(format: ExportFormat): Promise<boolean> {
+async function exportAs(format: ExportFormat | 'audio'): Promise<boolean> {
   if (!recordingId.value) return false
   try {
     return (await (await getSteno()).exportResult({ id: recordingId.value, format })).saved

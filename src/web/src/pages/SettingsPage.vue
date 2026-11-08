@@ -44,9 +44,13 @@ function setSpeed(value: number) {
 <template>
   <div class="page">
     <header class="topbar compact">
-      <RouterLink class="back-button" to="/library">‹</RouterLink
-      ><span class="topbar-title">{{ ru.settings.title }}</span
-      ><span class="topbar-spacer" />
+      <RouterLink class="back-button" to="/library" aria-label="Назад">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m10 3-5 5 5 5" />
+        </svg>
+      </RouterLink>
+      <span class="topbar-title">{{ ru.settings.title }}</span>
+      <span class="topbar-spacer" />
     </header>
     <main class="screen settings-screen">
       <section class="settings-hero">
@@ -72,7 +76,7 @@ function setSpeed(value: number) {
             :key="option.value"
             class="theme-option"
             :class="{ selected: settings.theme.value === option.value }"
-            @click="settings.theme.value = option.value as 'light' | 'dark' | 'system'"
+            @click="settings.setTheme(option.value as 'light' | 'dark' | 'system')"
           >
             <span class="theme-preview" :class="`preview-${option.value}`"><i /></span
             ><span class="theme-option-label">{{ option.icon }} {{ option.label }}</span

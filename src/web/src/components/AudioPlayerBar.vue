@@ -18,13 +18,13 @@ const durationMs = ref(props.durationMs)
 
 function toggle() {
   const a = audio.value
-  if (!a) return
+  if (!a || !props.src) return
   if (a.paused) void a.play()
   else a.pause()
 }
 function seek(ms: number) {
   const a = audio.value
-  if (!a) return
+  if (!a || !props.src) return
   a.currentTime = Math.max(0, ms) / 1000
   positionMs.value = ms
   emit('position', ms)
@@ -73,10 +73,10 @@ defineExpose({ seek })
 </script>
 
 <template>
-  <div class="player">
+  <div class="player" :class="{ loading: !src }">
     <audio
       ref="audio"
-      :src="src"
+      :src="src || undefined"
       preload="metadata"
       @timeupdate="onTime"
       @loadedmetadata="onMeta"
@@ -90,16 +90,26 @@ defineExpose({ seek })
         <span>{{ formatMs(positionMs) }} / {{ formatMs(durationMs) }}</span>
       </div>
       <div class="player-controls">
-        <button class="player-button skip" aria-label="Предыдущая реплика" @click="seekMarker(-1)">
+        <button
+          class="player-button skip"
+          :disabled="!src"
+          aria-label="Предыдущая реплика"
+          @click="seekMarker(-1)"
+        >
           ‹
         </button>
-        <button class="player-button main" aria-label="Пуск/пауза" @click="toggle">
+        <button class="player-button main" :disabled="!src" aria-label="Пуск/пауза" @click="toggle">
           <svg viewBox="0 0 24 24">
             <path v-if="!playing" d="m9 6 9 6-9 6V6Z" />
             <path v-else d="M8 6v12M16 6v12" />
           </svg>
         </button>
-        <button class="player-button skip" aria-label="Следующая реплика" @click="seekMarker(1)">
+        <button
+          class="player-button skip"
+          :disabled="!src"
+          aria-label="Следующая реплика"
+          @click="seekMarker(1)"
+        >
           ›
         </button>
       </div>
@@ -112,6 +122,7 @@ defineExpose({ seek })
       :value="positionMs"
       :style="{ '--progress': `${Math.min(100, (positionMs / Math.max(1, durationMs)) * 100)}%` }"
       aria-label="Позиция"
+      :disabled="!src"
       @input="seek(Number(($event.target as HTMLInputElement).value))"
     />
   </div>
@@ -125,6 +136,21 @@ defineExpose({ seek })
   border-radius: 22px;
   background: color-mix(in srgb, var(--app-surface-solid) 96%, transparent);
   backdrop-filter: blur(18px);
+  transition:
+    border-color 0.25s ease,
+    background 0.25s ease,
+    opacity 0.25s ease;
+}
+.player.loading {
+  border-color: color-mix(in srgb, var(--app-border) 72%, var(--app-primary));
+}
+.player.loading .track-info span {
+  color: var(--app-primary-soft);
+}
+.player-button:disabled,
+.seek-range:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 .player-content {
   display: flex;

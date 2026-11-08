@@ -17,6 +17,7 @@ const store = useTranscriptStore()
 const recordings = useRecordingsStore()
 const recording = computed(() => recordings.byId(props.id))
 const audioSrc = computed(() => (recording.value ? playableSrc(recording.value.audioPath) : ''))
+const playerTitle = computed(() => recording.value?.title ?? 'Подготавливаем аудио…')
 const tab = ref<'transcript' | 'protocol'>('transcript')
 const seekToMs = ref<number | null>(null)
 const toastOpen = ref(false)
@@ -28,11 +29,13 @@ const hasProtocol = computed(() => Boolean(store.result.value?.protocol?.trim())
 const protocolText = computed(() =>
   withSpeakerNames(store.result.value?.protocol ?? '', store.speakerNames.value),
 )
-/** Вкладка «Итоги» видна, когда они есть или ещё готовятся. */
-const showTabs = computed(() => hasProtocol.value || store.analysisPending.value)
+/** Разделитель вкладок нужен только если протокол действительно запрошен и создан. */
+const showTabs = hasProtocol
 onMounted(async () => {
-  if (!recordings.items.value.length) await recordings.refresh()
-  await store.load(props.id)
+  await Promise.all([
+    recordings.items.value.length ? Promise.resolve() : recordings.refresh(),
+    store.load(props.id),
+  ])
   tab.value = 'transcript'
 })
 watch([store.activeIndex, isPlaying], ([index, playing]) => {
@@ -63,38 +66,8 @@ async function exportAs(format: ExportFormat) {
   }
 }
 async function downloadAudio() {
-  if (!audioSrc.value) return
-  const title = recording.value?.title ?? 'recording'
-  const baseName = title.replace(/\.[^/.]+$/, '') || 'recording'
-  let downloadUrl = audioSrc.value
-  let objectUrl: string | null = null
-  let extension = title.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() ?? 'audio'
-
-  try {
-    const response = await fetch(audioSrc.value)
-    if (!response.ok) throw new Error(`Audio download failed: ${response.status}`)
-    const blob = await response.blob()
-    const mimeExtension: Record<string, string> = {
-      'audio/wav': 'wav',
-      'audio/x-wav': 'wav',
-      'audio/mpeg': 'mp3',
-      'audio/mp4': 'm4a',
-      'audio/ogg': 'ogg',
-      'audio/webm': 'webm',
-    }
-    extension = mimeExtension[blob.type.toLowerCase()] ?? extension
-    objectUrl = URL.createObjectURL(blob)
-    downloadUrl = objectUrl
-  } catch (error) {
-    // Native file URLs may not be fetchable from the WebView; the anchor still works there.
-    console.warn('[transcript] Could not inspect audio format before download', error)
-  }
-
-  const link = document.createElement('a')
-  link.href = downloadUrl
-  link.download = `${baseName}.${extension}`
-  link.click()
-  if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl as string), 1000)
+  if (!recording.value) return
+  await exportAs('audio')
   downloadOpen.value = false
 }
 function downloadJson() {
@@ -113,8 +86,12 @@ async function saveDetails(title: string, names: Record<string, string>) {
 <template>
   <div class="page transcript-page">
     <header class="topbar compact">
-      <RouterLink class="back-button" to="/library">‹</RouterLink
-      ><button
+      <RouterLink class="back-button" to="/library" aria-label="Назад">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m10 3-5 5 5 5" />
+        </svg>
+      </RouterLink>
+      <button
         class="topbar-title title-button"
         aria-label="Редактировать название и участников"
         @click="detailsOpen = true"
@@ -125,8 +102,9 @@ async function saveDetails(title: string, names: Record<string, string>) {
             <path d="m4 20 4.2-1 10.1-10.1a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" />
             <path d="m13.8 7.2 3 3" />
           </svg>
-        </i></button
-      ><button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
+        </i>
+      </button>
+      <button class="icon-button" aria-label="Скачать" @click="downloadOpen = true">⇩</button>
     </header>
     <main class="screen transcript-screen">
       <div v-if="showTabs" class="tabs">
@@ -166,7 +144,6 @@ async function saveDetails(title: string, names: Record<string, string>) {
             :names="store.speakerNames.value"
             @seek="seek"
             @longpress="editText"
-            @speaker="editText"
           />
         </div>
         <article v-else class="protocol surface">
@@ -178,11 +155,11 @@ async function saveDetails(title: string, names: Record<string, string>) {
         </article>
       </template>
     </main>
-    <footer v-if="recording" class="player-dock">
+    <footer class="player-dock" :aria-busy="!recording">
       <AudioPlayerBar
         :src="audioSrc"
-        :title="recording.title"
-        :duration-ms="recording.durationMs"
+        :title="playerTitle"
+        :duration-ms="recording?.durationMs ?? 0"
         :seek-to-ms="seekToMs"
         :markers="store.utterances.value.map((utterance) => utterance.start_ms)"
         @position="store.positionMs.value = $event"
@@ -220,6 +197,27 @@ async function saveDetails(title: string, names: Record<string, string>) {
 </template>
 
 <style scoped>
+.transcript-page > .topbar,
+.transcript-page > .transcript-screen,
+.transcript-page > .player-dock {
+  animation: transcript-element-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.transcript-page > .transcript-screen {
+  animation-delay: 0.035s;
+}
+.transcript-page > .player-dock {
+  animation-delay: 0.07s;
+}
+@keyframes transcript-element-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 .transcript-screen {
   padding-top: 10px;
   padding-bottom: 170px;

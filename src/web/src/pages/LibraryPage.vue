@@ -48,7 +48,7 @@ async function removePending() {
 }
 
 function toggleTheme() {
-  settings.theme.value = settings.theme.value === 'dark' ? 'light' : 'dark'
+  settings.setTheme(settings.theme.value === 'dark' ? 'light' : 'dark')
 }
 </script>
 
@@ -61,9 +61,7 @@ function toggleTheme() {
           <h1>{{ ru.library.title }}</h1>
         </div>
         <div class="header-actions">
-          <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings"
-            >⚙</RouterLink
-          >
+          <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings">⚙</RouterLink>
         </div>
       </div>
     </header>
@@ -151,9 +149,9 @@ function toggleTheme() {
         <button class="action secondary-action" @click="importFile">
           ↥ <span>{{ ru.library.import }}</span>
         </button>
-        <RouterLink class="action primary-action" to="/record"
-          >● <span>{{ ru.library.record }}</span></RouterLink
-        >
+        <RouterLink class="action primary-action" to="/record">
+          ● <span>{{ ru.library.record }}</span>
+        </RouterLink>
       </div>
     </footer>
     <ConfirmDialog
@@ -229,6 +227,18 @@ function toggleTheme() {
 }
 :root[data-theme='dark'] .welcome-copy p:last-child {
   color: #d3d0e6;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] .welcome-card {
+    background:
+      linear-gradient(135deg, rgba(47, 45, 80, 0.96), rgba(56, 38, 57, 0.92)), var(--app-lilac);
+  }
+  :root[data-theme='system'] .welcome-copy h1 {
+    color: #fff;
+  }
+  :root[data-theme='system'] .welcome-copy p:last-child {
+    color: #d3d0e6;
+  }
 }
 .welcome-copy {
   position: relative;
@@ -499,6 +509,10 @@ function toggleTheme() {
 .record-icon-processing {
   color: #d79b28;
   background: rgba(215, 155, 40, 0.14);
+}
+.record-icon-error {
+  color: #d95c6b;
+  background: rgba(217, 92, 107, 0.16);
 }
 .empty {
   margin-top: 24px;

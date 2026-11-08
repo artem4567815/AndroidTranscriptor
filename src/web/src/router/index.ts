@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useModelsStore } from '@/stores/models'
+import TranscriptPage from '@/pages/TranscriptPage.vue'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/library' },
@@ -16,7 +17,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/transcript/:id',
     name: 'transcript',
-    component: () => import('@/pages/TranscriptPage.vue'),
+    component: TranscriptPage,
     props: true,
   },
   { path: '/settings', name: 'settings', component: () => import('@/pages/SettingsPage.vue') },

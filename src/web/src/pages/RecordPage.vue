@@ -31,7 +31,11 @@ onBeforeUnmount(() => {
 <template>
   <div class="page record-page">
     <header class="topbar compact">
-      <RouterLink class="back-button" to="/library">‹</RouterLink>
+      <RouterLink class="back-button" to="/library" aria-label="Назад">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m10 3-5 5 5 5" />
+        </svg>
+      </RouterLink>
       <span class="topbar-title">{{ ru.record.title }}</span>
       <span class="topbar-spacer" />
     </header>
