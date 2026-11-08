@@ -333,17 +333,7 @@ function selectSpeaker(count: number) {
 }
 .stage-progress i.indeterminate {
   min-width: 24%;
-  animation: stage-pulse 0.8s ease-in-out infinite alternate;
-}
-@keyframes stage-pulse {
-  from {
-    opacity: 0.45;
-    transform: translateX(-8%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(8%);
-  }
+  opacity: 0.75;
 }
 .stage-row b {
   color: var(--app-primary);

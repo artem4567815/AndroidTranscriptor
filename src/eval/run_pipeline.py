@@ -42,6 +42,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--diarization-only", action="store_true",
                    help="только VAD + диаризация (без ASR): <имя>.json с пустым текстом — для eval_der.py "
                         "и подбора порогов диаризации; быстро и не зависит от языка записи")
+    p.add_argument("--diar-window-min", type=float, default=DIAR_WINDOW_MIN,
+                   help="первый проход sherpa окнами по N минут (0 — весь файл сразу), как SherpaDiarizer")
     p.add_argument("--embedding", default=None,
                    help="другая модель отпечатков голоса (.onnx) для сравнения по DER; "
                         "по умолчанию <models>/diarization/embedding.onnx")
@@ -77,6 +79,34 @@ def short_unit_embedding(ext, samples, a, b, lo, hi, duration_ms):
         if ext.is_ready(st):
             v = np.array(ext.compute(st)); vs.append(v / max(np.linalg.norm(v), 1e-9))
     return np.mean(vs, axis=0) if vs else None
+
+
+DIAR_WINDOW_MIN = 10
+DIAR_WINDOW_OVERLAP_S = 30
+
+
+def windowed_diarization(sd, samples, window_s: float, overlap_s: float) -> list[tuple[int, int, int]]:
+    """Порт SherpaDiarizer.diarize: окна с перекрытием, в перекрытии — граница посередине.
+    Номера спикеров в окнах разные (окно * 1000 + номер): общих людей находит второй проход."""
+    n = len(samples)
+    if window_s <= 0 or n <= window_s * SR:
+        return [(r.speaker, int(r.start * 1000), int(r.end * 1000)) for r in sd.process(samples).sort_by_start_time()]
+    win, step = int(window_s * SR), int((window_s - overlap_s) * SR)
+    out, start, w = [], 0, 0
+    while True:
+        end = min(n, start + win)
+        keep_from = start + (int(overlap_s * SR) // 2 if start > 0 else 0)
+        keep_to = end - (int(overlap_s * SR) // 2 if end < n else 0)
+        for r in sd.process(samples[start:end]).sort_by_start_time():
+            a = max(start + int(r.start * SR), keep_from)
+            b = min(start + int(r.end * SR), keep_to)
+            if b > a:
+                out.append((w * 1000 + r.speaker, a * 1000 // SR, b * 1000 // SR))
+        if end >= n:
+            break
+        start += step
+        w += 1
+    return sorted(out, key=lambda x: (x[1], x[2]))
 
 
 def main() -> int:
@@ -171,7 +201,7 @@ def main() -> int:
 
         t0 = time.perf_counter()
         sd = sherpa_onnx.OfflineSpeakerDiarization(diar_cfg)
-        diar = [(r.speaker, int(r.start * 1000), int(r.end * 1000)) for r in sd.process(samples).sort_by_start_time()]
+        diar = windowed_diarization(sd, samples, args.diar_window_min * 60, DIAR_WINDOW_OVERLAP_S)
         del sd
         # Второй проход (как в приложении): участки речи VAD → отпечатки голоса → группировка.
         units = speech_units(speech, diar)

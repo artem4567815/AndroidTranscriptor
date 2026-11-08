@@ -64,9 +64,20 @@ class SherpaDiarizer(
 
         sd.setConfig(sd.config.copy(clustering = DiarizationMapping.clustering(config)))
 
-        val raw = sd.processWithCallback(audio.samples, callback = ProgressCallback(onProgress))
+        val windows = DiarizationMapping.windows(audio.durationMs)
+        if (windows.size == 1) {
+            val raw = sd.processWithCallback(audio.samples, callback = ProgressCallback(onProgress))
+            onProgress(1f)
+            return DiarizationMapping.toSpeakerSegments(raw)
+        }
+        val out = ArrayList<SpeakerSegment>()
+        windows.forEachIndexed { i, w ->
+            val chunk = audio.slice(w.startMs, w.endMs)
+            val raw = sd.processWithCallback(chunk, callback = ProgressCallback { f -> onProgress((i + f) / windows.size) })
+            out += DiarizationMapping.stitch(DiarizationMapping.toSpeakerSegments(raw), w, i)
+        }
         onProgress(1f)
-        return DiarizationMapping.toSpeakerSegments(raw)
+        return out.sortedWith(compareBy<SpeakerSegment> { it.startMs }.thenBy { it.endMs })
     }
 
     /**
@@ -129,7 +140,40 @@ internal class ProgressCallback(private val onProgress: (Float) -> Unit) : (Int,
     }
 }
 
+/** sherpa получает [startMs, endMs), отрезки сохраняются только из [keepFromMs, keepToMs). */
+internal data class DiarizationWindow(val startMs: Long, val endMs: Long, val keepFromMs: Long, val keepToMs: Long)
+
 internal object DiarizationMapping {
+
+    /**
+     * Первый проход на длинной записи — окнами: sherpa держит буферы на весь переданный сигнал.
+     * Спикеров между окнами связывает второй проход ([SherpaDiarizer.labelUnits]).
+     */
+    const val WINDOW_MS = 10 * 60 * 1000L
+    const val WINDOW_OVERLAP_MS = 30_000L
+    private const val WINDOW_SPEAKER_STRIDE = 1000
+
+    fun windows(durationMs: Long, windowMs: Long = WINDOW_MS, overlapMs: Long = WINDOW_OVERLAP_MS): List<DiarizationWindow> {
+        if (durationMs <= windowMs) return listOf(DiarizationWindow(0, durationMs, 0, durationMs))
+        val out = ArrayList<DiarizationWindow>()
+        var start = 0L
+        while (true) {
+            val end = minOf(durationMs, start + windowMs)
+            val keepFrom = if (start == 0L) 0L else start + overlapMs / 2
+            val keepTo = if (end == durationMs) durationMs else end - overlapMs / 2
+            out += DiarizationWindow(start, end, keepFrom, keepTo)
+            if (end == durationMs) return out
+            start += windowMs - overlapMs
+        }
+    }
+
+    /** Отрезки окна → время записи, обрезка по своей части перекрытия, свои номера спикеров у каждого окна. */
+    fun stitch(segments: List<SpeakerSegment>, window: DiarizationWindow, index: Int): List<SpeakerSegment> =
+        segments.mapNotNull { s ->
+            val a = maxOf(window.startMs + s.startMs, window.keepFromMs)
+            val b = minOf(window.startMs + s.endMs, window.keepToMs)
+            if (b > a) SpeakerSegment(index * WINDOW_SPEAKER_STRIDE + s.speaker, a, b) else null
+        }
 
     /** Участки короче — несколько отпечатков со сдвигом краёв (см. [SherpaDiarizer.labelUnits]). */
     const val SHORT_UNIT_MS = 1500L
