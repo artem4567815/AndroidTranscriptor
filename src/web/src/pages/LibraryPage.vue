@@ -61,7 +61,9 @@ function toggleTheme() {
           <h1>{{ ru.library.title }}</h1>
         </div>
         <div class="header-actions">
-          <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings">⚙</RouterLink>
+          <RouterLink class="icon-button" :aria-label="ru.library.settings" to="/settings"
+            >⚙</RouterLink
+          >
         </div>
       </div>
     </header>
