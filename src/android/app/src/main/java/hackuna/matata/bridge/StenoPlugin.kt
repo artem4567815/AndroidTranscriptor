@@ -65,7 +65,7 @@ class StenoPlugin : Plugin(), KoinComponent {
     private var recorder: AudioRecorder? = null
     private var recordingId: String? = null
     private var lastLevelAt = 0L
-    private var pendingExport: Pair<String, String>? = null // имя файла → содержимое
+    private var pendingExport: Pair<String, ByteArray>? = null // имя файла → содержимое
 
     override fun load() {
         scope.launch {
@@ -250,12 +250,12 @@ class StenoPlugin : Plugin(), KoinComponent {
 
     @PluginMethod
     fun exportResult(call: PluginCall) = io(call) {
-        val (name, content, format) = buildExport(call)
-        pendingExport = name to content
+        val export = buildExport(call)
+        pendingExport = export.name to export.bytes
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = format.mimeType
-            putExtra(Intent.EXTRA_TITLE, name)
+            type = export.mimeType
+            putExtra(Intent.EXTRA_TITLE, export.name)
         }
         activity.runOnUiThread { startActivityForResult(call, intent, "onExportResult") }
     }
@@ -271,7 +271,7 @@ class StenoPlugin : Plugin(), KoinComponent {
             return
         }
         io(call) {
-            context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(export.second.toByteArray()) }
+            context.contentResolver.openOutputStream(uri, "w")?.use { it.write(export.second) }
                 ?: throw StenoException(ErrorCode.UNKNOWN, "Не удалось открыть файл для записи")
             call.resolve(JSObject().put("saved", true))
         }
@@ -279,29 +279,44 @@ class StenoPlugin : Plugin(), KoinComponent {
 
     @PluginMethod
     fun share(call: PluginCall) = io(call) {
-        val (name, content, format) = buildExport(call)
+        val export = buildExport(call)
         val dir = File(context.cacheDir, "exports").apply { mkdirs() }
-        val file = File(dir, name).apply { writeText(content) }
+        val file = File(dir, export.name).apply { writeBytes(export.bytes) }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val send = Intent(Intent.ACTION_SEND).apply {
-            type = format.mimeType
+            type = export.mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        activity.runOnUiThread { activity.startActivity(Intent.createChooser(send, name)) }
+        activity.runOnUiThread { activity.startActivity(Intent.createChooser(send, export.name)) }
         call.resolve()
     }
 
-    private data class Export(val name: String, val content: String, val format: ExportFormat)
+    private data class Export(val name: String, val bytes: ByteArray, val mimeType: String)
 
     private suspend fun buildExport(call: PluginCall): Export {
         val id = call.requireString("id")
-        val format = ExportFormat.parse(call.getString("format"))
-            ?: throw IllegalArgumentException("format: json | txt | srt")
         val rec = repo.getRecording(id) ?: throw StenoException(ErrorCode.UNKNOWN, "Запись $id не найдена")
+        if (call.getString("format") == "audio") {
+            val source = File(rec.sourcePath)
+            if (!source.isFile) throw StenoException(ErrorCode.UNKNOWN, "Аудиофайл не найден")
+            val name = source.name.ifBlank { "${rec.title.substringBeforeLast('.')}.audio" }
+            return Export(name, source.readBytes(), mimeForAudio(source.name))
+        }
+        val format = ExportFormat.parse(call.getString("format"))
+            ?: throw IllegalArgumentException("format: json | txt | srt | audio")
         val result = repo.getResult(id) ?: throw StenoException(ErrorCode.UNKNOWN, "Нет расшифровки")
         val base = rec.title.substringBeforeLast('.').replace(Regex("[^\\p{L}\\p{N} _.-]"), "_").ifBlank { "transcript" }
-        return Export("$base.${format.extension}", TranscriptExporter.export(result, format), format)
+        return Export("$base.${format.extension}", TranscriptExporter.export(result, format).toByteArray(), format.mimeType)
+    }
+
+    private fun mimeForAudio(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+        "wav" -> "audio/wav"
+        "mp3" -> "audio/mpeg"
+        "m4a", "mp4" -> "audio/mp4"
+        "ogg", "opus" -> "audio/ogg"
+        "webm" -> "audio/webm"
+        else -> "application/octet-stream"
     }
 
     // ---- Вспомогательное ----

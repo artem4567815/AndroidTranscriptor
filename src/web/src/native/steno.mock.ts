@@ -424,7 +424,7 @@ export function createStenoMock(): StenoMock {
     async renameSpeaker({ id, speakerId, name }) {
       result(id).speakerNames[speakerId] = name
     },
-    async exportResult({ id, format }: { id: string; format: ExportFormat }) {
+    async exportResult({ id, format }: { id: string; format: ExportFormat | 'audio' }) {
       // Строгий JSON собирает Kotlin; мок лишь печатает сырой объект для отладки.
       console.info('[steno.mock] export', format, result(id).transcript)
       return { saved: true }

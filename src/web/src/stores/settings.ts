@@ -132,6 +132,10 @@ function resetDefaults() {
   overrides.value = {}
 }
 
+function setTheme(value: Persisted['theme']) {
+  theme.value = value
+}
+
 async function loadModels() {
   modelsError.value = null
   try {
@@ -172,6 +176,7 @@ export function useSettingsStore() {
     modelsError,
     pipelineOptions,
     resetDefaults,
+    setTheme,
     loadModels,
     isMock,
     devFailNext,

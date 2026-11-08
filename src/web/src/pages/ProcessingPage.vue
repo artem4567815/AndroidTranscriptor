@@ -16,22 +16,16 @@ const settings = useSettingsStore()
 const recording = () => recordings.byId(props.id)
 const speakerOptions = [0, 2, 3, 4, 5, 6]
 const speakerOpen = ref(false)
-const estimatedRemaining = computed(() => {
-  if (!processing.running.value || processing.elapsedMs.value < 1000) return null
-  const progress =
-    STAGES.reduce((sum, stage) => sum + processing.stages[stage].fraction, 0) / STAGES.length
-  if (progress < 0.05 || progress >= 1) return null
-  return Math.max(1000, processing.elapsedMs.value * ((1 - progress) / progress))
-})
+const isCurrent = computed(() => processing.recordingId.value === props.id)
 onMounted(async () => {
   await processing.ensureListeners()
   if (!recordings.items.value.length) await recordings.refresh()
-  if (!processing.running.value) processing.select(props.id)
+  if (!isCurrent.value) processing.select(props.id)
 })
 watch(
-  () => processing.completed.value,
+  () => [processing.completed.value, processing.recordingId.value],
   (done) => {
-    if (done) void router.replace(`/transcript/${props.id}`)
+    if (done[0] && done[1] === props.id) void router.replace(`/transcript/${props.id}`)
   },
 )
 function start() {
@@ -46,16 +40,20 @@ function selectSpeaker(count: number) {
 <template>
   <div class="page">
     <header class="topbar compact">
-      <RouterLink class="back-button" to="/library">‹</RouterLink
-      ><span class="topbar-title">{{ ru.processing.title }}</span
-      ><span class="topbar-spacer" />
+      <RouterLink class="back-button" to="/library" aria-label="Назад">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="m10 3-5 5 5 5" />
+        </svg>
+      </RouterLink>
+      <span class="topbar-title">{{ ru.processing.title }}</span>
+      <span class="topbar-spacer" />
     </header>
     <main class="screen processing-screen">
       <p class="eyebrow">Рабочий процесс</p>
       <h1>{{ recording()?.title ?? 'Подготовка записи' }}</h1>
       <p v-if="recording()" class="muted mono">{{ formatMs(recording()!.durationMs) }}</p>
       <section
-        v-if="!processing.running.value && !processing.completed.value"
+        v-if="!isCurrent || (!processing.running.value && !processing.completed.value)"
         class="options-card surface"
       >
         <div class="option-row">
@@ -63,7 +61,9 @@ function selectSpeaker(count: number) {
           <div class="select-control">
             <button class="select-trigger" @click="speakerOpen = !speakerOpen">
               {{ settings.numSpeakers.value === 0 ? ru.common.auto : settings.numSpeakers.value }}
-              <span>⌄</span></button
+              <span class="chevron" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="m3.5 6 4.5 4 4.5-4" /></svg>
+              </span></button
             ><Transition name="dropdown"
               ><div v-if="speakerOpen" class="select-menu">
                 <button
@@ -99,15 +99,15 @@ function selectSpeaker(count: number) {
         /></label>
       </section>
       <section
-        v-if="processing.running.value || processing.completed.value || processing.failure.value"
+        v-if="
+          isCurrent &&
+          (processing.running.value || processing.completed.value || processing.failure.value)
+        "
         class="stage-card surface"
       >
         <div class="stage-heading">
           <span>Обработка записи</span><strong>{{ formatMs(processing.elapsedMs.value) }}</strong>
         </div>
-        <p v-if="estimatedRemaining" class="estimate">
-          Осталось примерно {{ formatMs(estimatedRemaining) }}
-        </p>
         <div v-for="stage in STAGES" :key="stage" class="stage-row">
           <span
             class="stage-dot"
@@ -124,19 +124,29 @@ function selectSpeaker(count: number) {
                 ? `${Math.round(processing.stages[stage].fraction * 100)}%`
                 : ''
           }}</b>
+          <span class="stage-progress" aria-hidden="true">
+            <i
+              :class="{ indeterminate: processing.currentStage.value === stage }"
+              :style="{ width: `${Math.round(processing.stages[stage].fraction * 100)}%` }"
+            />
+          </span>
         </div>
       </section>
       <p v-if="processing.failure.value" class="inline-error">
         {{ processing.failure.value.text }}
       </p>
       <button
-        v-if="processing.running.value"
+        v-if="isCurrent && processing.running.value"
         class="action secondary-action full"
         @click="processing.cancel"
       >
         {{ ru.common.cancel }}
       </button>
-      <button v-else class="action primary-action full" @click="start">
+      <button
+        v-else-if="!isCurrent || !processing.running.value"
+        class="action primary-action full"
+        @click="start"
+      >
         {{ processing.failure.value ? ru.common.retry : ru.processing.start }}
       </button>
     </main>
@@ -146,6 +156,7 @@ function selectSpeaker(count: number) {
 <style scoped>
 .processing-screen {
   padding-top: 24px;
+  padding-bottom: 140px;
 }
 .processing-screen h1 {
   margin: 0;
@@ -195,9 +206,21 @@ function selectSpeaker(count: number) {
   color: var(--app-primary);
   background: var(--app-surface-solid);
   font-weight: 750;
+  justify-content: space-between;
+  min-width: 92px;
 }
 .select-trigger span {
-  font-size: 17px;
+  display: grid;
+  place-items: center;
+}
+.select-trigger svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .select-menu {
   position: absolute;
@@ -284,12 +307,43 @@ function selectSpeaker(count: number) {
 }
 .stage-row {
   display: grid;
-  grid-template-columns: 14px 1fr auto;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-height: 46px;
   padding: 0 12px;
   font-size: 14px;
+}
+.stage-progress {
+  grid-column: 2 / -1;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  margin: -5px 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--app-border) 55%, transparent);
+}
+.stage-progress i {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--app-primary-soft), var(--app-primary));
+  transition: width 0.25s ease;
+}
+.stage-progress i.indeterminate {
+  min-width: 24%;
+  animation: stage-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes stage-pulse {
+  from {
+    opacity: 0.45;
+    transform: translateX(-8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(8%);
+  }
 }
 .stage-row b {
   color: var(--app-primary);

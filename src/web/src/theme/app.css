@@ -32,6 +32,10 @@ a {
 .app-shell,
 .page {
   min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+.app-shell {
   background:
     radial-gradient(
       ellipse at 92% 8%,
@@ -55,6 +59,57 @@ a {
     100% 100%,
     100% 100%,
     auto;
+  isolation: isolate;
+  transition: background-color 0.35s ease;
+}
+.page {
+  background: transparent;
+}
+/* The ambient layer belongs to the persistent app shell, so routes do not move it. */
+.app-shell::before,
+.app-shell::after {
+  position: fixed;
+  z-index: 0;
+  width: 42vw;
+  height: 42vw;
+  max-width: 360px;
+  max-height: 360px;
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+  filter: blur(28px);
+  opacity: 0.18;
+  animation: ambient-drift 18s ease-in-out infinite alternate;
+}
+.app-shell::before {
+  top: 10%;
+  right: -12%;
+  background: var(--app-peach);
+}
+.app-shell::after {
+  bottom: 8%;
+  left: -14%;
+  background: var(--app-mint);
+  animation-delay: -7s;
+  animation-duration: 23s;
+}
+.app-shell > * {
+  position: relative;
+  z-index: 1;
+}
+@keyframes ambient-drift {
+  from {
+    transform: translate3d(-10px, -8px, 0) scale(0.96);
+  }
+  to {
+    transform: translate3d(12px, 10px, 0) scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell::before,
+  .app-shell::after {
+    animation: none;
+  }
 }
 .muted {
   color: var(--app-muted);
@@ -142,6 +197,24 @@ a {
   background: var(--app-surface);
   font-size: 22px;
   text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+.back-button:active,
+.icon-button:active {
+  transform: scale(0.94);
+}
+.back-button svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .bottom-actions {
   position: fixed;
@@ -240,6 +313,17 @@ a {
 .slide-back-enter-active {
   animation-name: page-in-back;
 }
+.slide-forward-enter-active.transcript-page,
+.slide-back-enter-active.transcript-page {
+  animation: none;
+}
+.slide-forward-enter-active.transcript-page > *,
+.slide-back-enter-active.transcript-page > * {
+  animation: route-element-in 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.slide-back-enter-active.transcript-page > * {
+  animation-name: route-element-in-back;
+}
 @keyframes fade-up {
   from {
     opacity: 0;
@@ -268,6 +352,26 @@ a {
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
+  }
+}
+@keyframes route-element-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes route-element-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 @media (max-width: 390px) {

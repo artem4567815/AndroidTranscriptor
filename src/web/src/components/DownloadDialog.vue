@@ -13,7 +13,12 @@ const emit = defineEmits<{ audio: []; json: []; cancel: [] }>()
           <p>Выберите, что сохранить на устройство.</p>
           <div class="download-options">
             <button class="download-option" @click="emit('audio')">
-              <span class="download-option-icon">◖</span>
+              <span class="download-option-icon audio-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8" />
+                </svg>
+              </span>
               <span><b>Аудиозапись</b><small>Исходный файл записи</small></span>
             </button>
             <button class="download-option" @click="emit('json')">
@@ -53,6 +58,15 @@ const emit = defineEmits<{ audio: []; json: []; cancel: [] }>()
   place-items: center;
   color: var(--app-primary);
   background: color-mix(in srgb, var(--app-primary) 13%, transparent);
+}
+.download-option-icon svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 .download-mark {
   width: 38px;

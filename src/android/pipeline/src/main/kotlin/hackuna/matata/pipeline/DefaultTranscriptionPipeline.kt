@@ -75,15 +75,21 @@ class DefaultTranscriptionPipeline(
             log("vad: regions=${speech.size} speechMs=${speech.sumOf { it.endMs - it.startMs }}")
 
             val speakers = step(Stage.DIARIZATION) {
-                diarizerFactory.create(config).use { d ->
-                    val found = d.diarize(audio, config) { f ->
-                        trySend(PipelineEvent.Progress(Stage.DIARIZATION, (f * 0.8f).coerceIn(0f, 0.8f)))
-                    }
-                    // Участки речи (VAD, разрезанные по сменам спикера из первого прохода) + второй проход.
-                    val units = SegmentPlanner.speechUnits(speech, found)
-                    val labels = if (config.regroupSpeakers && units.size >= 2) d.labelUnits(audio, units, config) else null
-                    if (units.isEmpty()) found else SegmentPlanner.labelUnits(units, labels, found)
-                }.ifEmpty { SegmentPlanner.fallbackSegments(speech) }
+                if (requiresLightweightDiarization(audio)) {
+                    log("long audio: using VAD segments instead of full-file diarization")
+                    trySend(PipelineEvent.Progress(Stage.DIARIZATION, 1f))
+                    SegmentPlanner.fallbackSegments(speech)
+                } else {
+                    diarizerFactory.create(config).use { d ->
+                        val found = d.diarize(audio, config) { f ->
+                            trySend(PipelineEvent.Progress(Stage.DIARIZATION, (f * 0.8f).coerceIn(0f, 0.8f)))
+                        }
+                        // Участки речи (VAD, разрезанные по сменам спикера из первого прохода) + второй проход.
+                        val units = SegmentPlanner.speechUnits(speech, found)
+                        val labels = if (config.regroupSpeakers && units.size >= 2) d.labelUnits(audio, units, config) else null
+                        if (units.isEmpty()) found else SegmentPlanner.labelUnits(units, labels, found)
+                    }.ifEmpty { SegmentPlanner.fallbackSegments(speech) }
+                }
             }
             log("diarization: segments=${speakers.size} speakers=${speakers.map { it.speaker }.distinct().size}")
 
@@ -131,6 +137,17 @@ class DefaultTranscriptionPipeline(
         SpeakerText(chunk.speaker, chunk.startMs, chunk.endMs, recognized.text)
 
     /**
+     * Offline diarization keeps large native buffers for the whole signal. On long recordings that
+     * competes with the PCM and ASR model for the Android heap, so use VAD boundaries as stable
+     * ASR chunks instead of failing the entire recording with OUT_OF_MEMORY.
+     */
+    private fun requiresLightweightDiarization(audio: PcmAudio): Boolean {
+        val pcmBytes = audio.samples.size.toLong() * Float.SIZE_BYTES
+        val maxHeap = Runtime.getRuntime().maxMemory()
+        return audio.durationMs >= LONG_AUDIO_THRESHOLD_MS && pcmBytes * 3L > maxHeap / 2L
+    }
+
+    /**
      * Анализ готовой расшифровки: имена спикеров из самопредставлений ([SpeakerNames], без LLM — работают и при
      * сбое LLM) + итоги и правка от LLM. Сбой LLM не трогает расшифровку, вместо итогов — причина
      * («Итоги не составлены: мало свободной памяти…»).
@@ -164,5 +181,6 @@ class DefaultTranscriptionPipeline(
 
     companion object {
         const val TAG = "Pipeline"
+        const val LONG_AUDIO_THRESHOLD_MS = 10 * 60 * 1000L
     }
 }

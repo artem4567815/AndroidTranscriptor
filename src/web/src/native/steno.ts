@@ -161,7 +161,7 @@ export interface StenoPlugin {
   }): Promise<void>
   renameSpeaker(o: { id: string; speakerId: string; name: string }): Promise<void>
   /** Системный диалог сохранения; JSON собирает только Kotlin. */
-  exportResult(o: { id: string; format: ExportFormat }): Promise<{ saved: boolean }>
+  exportResult(o: { id: string; format: ExportFormat | 'audio' }): Promise<{ saved: boolean }>
   share(o: { id: string; format: ExportFormat }): Promise<void>
   addListener(e: 'progress', cb: (e: ProgressEvent) => void): Promise<PluginListenerHandle>
   addListener(e: 'completed', cb: (e: CompletedEvent) => void): Promise<PluginListenerHandle>
