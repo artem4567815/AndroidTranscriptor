@@ -7,7 +7,7 @@ Android-приложение для хакатона **Nuclear IT Hack**: лок
 
 **Конвейер:** декодирование 16 кГц моно → предобработка → VAD (Silero) → диаризация
 (pyannote-segmentation-3.0 + 3D-Speaker) → ASR по сегментам говорящих (GigaAM v3 e2e) →
-склейка реплик → LLM-постобработка (LiteRT-LM) → Room и экспорт.
+склейка реплик → сохранение в Room и показ расшифровки → итоги от LLM (LiteRT-LM, Qwen3-1.7B) в фоне → экспорт.
 
 **Стек:** Vue 3 + Ionic Vue внутри Capacitor 8 (интерфейс) · Kotlin-модули (вся обработка) ·
 sherpa-onnx · LiteRT-LM · Room · Koin.
@@ -40,16 +40,21 @@ scripts/build_release.sh
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | модули, конвейер, правила зависимостей, мост Vue ↔ Kotlin |
 | [docs/MODELS.md](docs/MODELS.md) | модели: назначение, версия, размер, лицензия |
 | [docs/WEB_DEV.md](docs/WEB_DEV.md) | для Vue-разработчика: три режима запуска, мок, отладка |
-| [docs/TEAM.md](docs/TEAM.md) | роли, задачи, таймлайн |
-| [docs/ROLE3.md](docs/ROLE3.md) | диаризация, пайплайн и мост: состояние, вводная, грабли |
 | [docs/TESTS.md](docs/TESTS.md) | метрики WER / DER / RTF, собственные тесты |
 | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | требования к телефону, известные ограничения |
-| [docs/BACKLOG.md](docs/BACKLOG.md) | идеи и улучшения |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | журнал решений |
-| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | ветки, PR, стиль кода |
-| [docs/SETUP_REPORT.md](docs/SETUP_REPORT.md) | отчёт о создании каркаса |
 
-Релиз APK: см. [artifacts/README.md](artifacts/README.md).
+## Что сдаём
+
+| Материал | Где |
+|---|---|
+| 1. APK | [релиз v0.3.1](https://github.com/artem4567815/AndroidTranscriptor/releases/tag/v0.3.1), [скачать APK](https://github.com/artem4567815/AndroidTranscriptor/releases/download/v0.3.1/neuro-stenographer-0.3.1.apk) (1,2 ГБ), SHA-256 в [artifacts/README.md](artifacts/README.md) |
+| 2. Исходный код | этот репозиторий: `src/web` (интерфейс), `src/android` (обработка), `src/eval` (стенд метрик), `scripts` |
+| 3. Установка и использование | [docs/INSTALL.md](docs/INSTALL.md) |
+| 4. Архитектура и модели | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/MODELS.md](docs/MODELS.md) |
+| 5. Ограничения | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) |
+| 6. Результаты собственных тестов | [docs/TESTS.md](docs/TESTS.md) |
+| 7. Видеодемонстрация | [видео на Яндекс Диске](https://disk.yandex.ru/i/xV-XShYDMeQerA) |
 
 ## Формат экспорта
 

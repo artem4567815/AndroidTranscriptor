@@ -47,7 +47,6 @@ class RecordingFiles(
             val playable = if (ext in WEBVIEW_PLAYABLE) {
                 source
             } else {
-                // Редкий формат (amr, 3gp, wma…): WAV-копия для <audio>; заодно проверка, что декодируется.
                 val pcm = decoder.decode(source.absolutePath)
                 duration = pcm.durationMs
                 File(dir, "$id.play.wav").also { WavWriter.write(it, pcm) }
@@ -108,7 +107,6 @@ class RecordingFiles(
 
     private companion object {
         const val TAG = "RecordingFiles"
-        /** Что гарантированно играет Chromium WebView без конвертации. */
         val WEBVIEW_PLAYABLE = setOf("mp3", "m4a", "mp4", "aac", "ogg", "oga", "opus", "wav", "flac", "webm")
     }
 }

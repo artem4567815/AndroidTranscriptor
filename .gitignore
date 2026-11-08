@@ -99,8 +99,8 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 
-### Артефакты релиза (APK публикуется в GitHub Releases) ###
+### Артефакты релиза (APK публикуется в GitHub Releases, см. artifacts/README.md) ###
 artifacts/apk/
 
-### Исходный промпт в корне (копия лежит в docs/AGENT_PROMPT.md) ###
+### Исходный промпт в корне ###
 /Промпт*.md
