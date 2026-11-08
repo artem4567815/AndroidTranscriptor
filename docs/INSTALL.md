@@ -2,7 +2,7 @@
 
 ## Установка APK
 
-1. Скачайте `neuro-stenographer-<версия>.apk` из GitHub Releases (ссылка в `artifacts/README.md`).
+1. Скачайте [neuro-stenographer-0.3.1.apk](https://github.com/artem4567815/AndroidTranscriptor/releases/download/v0.3.1/neuro-stenographer-0.3.1.apk) (1,2 ГБ) со страницы [релиза v0.3.1](https://github.com/artem4567815/AndroidTranscriptor/releases/tag/v0.3.1); SHA-256 — в `artifacts/README.md`.
 2. Разрешите установку из неизвестных источников и установите APK.
 3. Телефон: Android 8.0+ (API 26), процессор **arm64-v8a**, свободно ≥ 2 ГБ (модели копируются во внутреннюю память).
 
@@ -32,6 +32,11 @@ JSON экспортируется строго в формате организ�
 
 Требования: Android Studio (Standard setup: SDK, JBR), Node.js LTS, JDK 21 для Gradle из терминала
 (Gradle 8.14 не запускается на JDK 25 — в Android Studio выберите *Settings → Build Tools → Gradle → Gradle JDK* = 21).
+
+Gradle ищет Android SDK в `ANDROID_HOME` или в `src/android/local.properties` (`sdk.dir=...`). Android Studio
+создаёт этот файл сама при первом открытии проекта; на чистом клоне из терминала задайте путь
+(`export ANDROID_HOME=$HOME/Library/Android/sdk` на macOS). `scripts/build_release.sh` находит SDK в стандартных
+папках сам. Скачивание `.so` и моделей — ~2 ГБ, нужны `curl`, `python3` и ~8 ГБ свободного места на сборку.
 
 ```bash
 scripts/fetch_sherpa.sh          # .so и Kotlin API sherpa-onnx

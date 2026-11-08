@@ -29,7 +29,6 @@ class StenoApp : Application() {
                 appModule,
             )
         }
-        // Процесс только что стартовал — значит, обработка, помеченная PROCESSING, была прервана.
         get<CoroutineScope>(named(APP_SCOPE)).launch(Dispatchers.IO) {
             get<TranscriptRepository>().resetStaleProcessing()
         }

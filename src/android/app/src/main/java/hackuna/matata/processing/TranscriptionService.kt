@@ -29,8 +29,6 @@ class TranscriptionService : LifecycleService() {
         super.onStartCommand(intent, flags, startId)
         ensureChannel()
         val notification = build("Подготовка…", 0)
-        // Не через ServiceCompat.startForeground: на Android 14+ он маскирует тип своим списком,
-        // где нет mediaProcessing (Android 15), и система получает «type none» → краш.
         when {
             Build.VERSION.SDK_INT >= 35 ->
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)

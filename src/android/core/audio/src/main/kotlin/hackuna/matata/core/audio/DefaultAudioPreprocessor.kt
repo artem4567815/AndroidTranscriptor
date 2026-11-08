@@ -6,7 +6,6 @@ import kotlin.math.abs
 
 /**
  * Предобработка перед VAD и ASR: удаление постоянной составляющей и нормализация пика.
- * Шумоподавление — TODO(роль 2): OfflineSpeechDenoiser из sherpa-onnx по флагу enableDenoise.
  */
 class DefaultAudioPreprocessor(
     private val targetPeak: Float = 0.9f,
@@ -16,7 +15,6 @@ class DefaultAudioPreprocessor(
     override fun process(audio: PcmAudio): PcmAudio {
         val s = audio.samples
         if (s.isEmpty()) return audio
-        // DC-фильтр первого порядка: y[n] = x[n] - x[n-1] + R * y[n-1]
         val r = 0.995f
         var prevX = 0f
         var prevY = 0f

@@ -54,14 +54,11 @@ fetch "$REL/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.ta
 tar -xjf "$TMP/seg.tar.bz2" -C "$TMP"
 cp "$(pick "$TMP/sherpa-onnx-pyannote-segmentation-3-0/model.int8.onnx" "$TMP/sherpa-onnx-pyannote-segmentation-3-0/model.onnx")" \
   "$DEST/diarization/segmentation.onnx"
-# Отпечатки голоса: CAM++ zh-cn — лучшая из 6 моделей на наших записях (русская игра в слова, синтетика,
-# тестовые записи sherpa), см. docs/TESTS.md. Русской модели у sherpa-onnx нет. Сравнить другую:
-# EMBEDDING=3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx EMBEDDING_SHA256=... $0
 EMBEDDING="${EMBEDDING:-3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx}"
 EMBEDDING_SHA256="${EMBEDDING_SHA256:-f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11}"
 fetch "$REL/speaker-recongition-models/$EMBEDDING" "$DEST/diarization/embedding.onnx" "$EMBEDDING_SHA256"
 
-# 4. LLM (роль 4)
+# 4. LLM
 if [[ "${1:-}" == "--with-llm" ]]; then
   # Qwen3-1.7B, веса int4, формат LiteRT-LM (Apache-2.0). Почему она — docs/MODELS.md.
   # Другую модель можно подставить: LLM_URL=<прямая ссылка на .litertlm> LLM_SHA256=<sha256> $0 --with-llm

@@ -33,7 +33,6 @@ if [[ -z "$SRC_JNI" ]]; then
 fi
 mkdir -p "$JNI_DIR"
 rm -f "$JNI_DIR"/*.so
-# Kotlin API через JNI нужны только эти две библиотеки (c-api/cxx-api — для C/C++).
 cp "$SRC_JNI/libsherpa-onnx-jni.so" "$SRC_JNI/libonnxruntime.so" "$JNI_DIR/"
 ls -la "$JNI_DIR"
 
@@ -48,7 +47,6 @@ FILES=(
 )
 mkdir -p "$KT_DIR"
 for f in "${FILES[@]}"; do
-  # Качаем во временный файл: при обрыве сети старая рабочая копия не портится.
   curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 -o "$TMP/$f" \
     "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v$VERSION/sherpa-onnx/kotlin-api/$f"
   mv "$TMP/$f" "$KT_DIR/$f"

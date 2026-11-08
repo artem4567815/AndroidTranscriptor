@@ -38,15 +38,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import java.util.UUID
-
-/**
- * Kotlin-сторона контракта моста (см. src/web/src/native/steno.ts).
- * Меняется только вместе с steno.ts одним PR, с ревью ролей 1 и 3.
- *
- * Правила: каждый метод сразу уходит в корутину (Default — вычисления, IO — файлы);
- * ответ — call.resolve или call.reject(message, code) с кодом из [ErrorCode];
- * через мост не ходит аудио — только id, пути, настройки, прогресс и JSON.
- */
 @CapacitorPlugin(
     name = "Steno",
     permissions = [
