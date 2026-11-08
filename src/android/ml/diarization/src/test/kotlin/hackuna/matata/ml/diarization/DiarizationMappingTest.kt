@@ -70,4 +70,30 @@ class DiarizationMappingTest {
         assertArrayEquals(floatArrayOf(0.5f, 0.5f), avg, 1e-6f)
         assertNull(DiarizationMapping.average(emptyList()))
     }
+
+    @Test
+    fun `короткая запись — одно окно на весь файл`() {
+        assertEquals(listOf(DiarizationWindow(0, 300_000, 0, 300_000)), DiarizationMapping.windows(300_000))
+    }
+
+    @Test
+    fun `длинная запись — окна с перекрытием, сохраняемые части стыкуются без дыр`() {
+        val w = DiarizationMapping.windows(24 * 60_000L, windowMs = 600_000, overlapMs = 30_000)
+        assertEquals(3, w.size)
+        assertEquals(DiarizationWindow(0, 600_000, 0, 585_000), w[0])
+        assertEquals(DiarizationWindow(570_000, 1_170_000, 585_000, 1_155_000), w[1])
+        assertEquals(DiarizationWindow(1_140_000, 1_440_000, 1_155_000, 1_440_000), w[2])
+        w.zipWithNext().forEach { (a, b) -> assertEquals(a.keepToMs, b.keepFromMs) }
+    }
+
+    @Test
+    fun `склейка — время записи, обрезка по перекрытию, свои номера спикеров у окна`() {
+        val window = DiarizationWindow(570_000, 1_170_000, 585_000, 1_155_000)
+        val out = DiarizationMapping.stitch(
+            listOf(SpeakerSegment(0, 5_000, 20_000), SpeakerSegment(1, 30_000, 40_000), SpeakerSegment(0, 590_000, 600_000)),
+            window,
+            index = 1,
+        )
+        assertEquals(listOf(SpeakerSegment(1000, 585_000, 590_000), SpeakerSegment(1001, 600_000, 610_000)), out)
+    }
 }

@@ -76,7 +76,7 @@ class DefaultTranscriptionPipeline(
 
             val speakers = step(Stage.DIARIZATION) {
                 if (requiresLightweightDiarization(audio)) {
-                    log("long audio: using VAD segments instead of full-file diarization")
+                    log("not enough memory for a diarization window: one speaker, VAD segments")
                     trySend(PipelineEvent.Progress(Stage.DIARIZATION, 1f))
                     SegmentPlanner.fallbackSegments(speech)
                 } else {
@@ -137,14 +137,13 @@ class DefaultTranscriptionPipeline(
         SpeakerText(chunk.speaker, chunk.startMs, chunk.endMs, recognized.text)
 
     /**
-     * Offline diarization keeps large native buffers for the whole signal. On long recordings that
-     * competes with the PCM and ASR model for the Android heap, so use VAD boundaries as stable
-     * ASR chunks instead of failing the entire recording with OUT_OF_MEMORY.
+     * Последний рубеж: рядом с записью не помещается даже копия одного окна диаризации (10 мин звука).
+     * Тогда вся речь — один спикер, но расшифровка не падает.
      */
     private fun requiresLightweightDiarization(audio: PcmAudio): Boolean {
         val pcmBytes = audio.samples.size.toLong() * Float.SIZE_BYTES
-        val maxHeap = Runtime.getRuntime().maxMemory()
-        return audio.durationMs >= LONG_AUDIO_THRESHOLD_MS && pcmBytes * 3L > maxHeap / 2L
+        val windowBytes = minOf(audio.durationMs, DIARIZATION_WINDOW_MS) * PcmAudio.MODEL_SAMPLE_RATE / 1000 * Float.SIZE_BYTES
+        return pcmBytes + 2 * windowBytes > Runtime.getRuntime().maxMemory() * 8 / 10
     }
 
     /**
@@ -181,6 +180,6 @@ class DefaultTranscriptionPipeline(
 
     companion object {
         const val TAG = "Pipeline"
-        const val LONG_AUDIO_THRESHOLD_MS = 10 * 60 * 1000L
+        const val DIARIZATION_WINDOW_MS = 10 * 60 * 1000L
     }
 }

@@ -79,7 +79,6 @@ a {
   pointer-events: none;
   filter: blur(28px);
   opacity: 0.18;
-  animation: ambient-drift 18s ease-in-out infinite alternate;
 }
 .app-shell::before {
   top: 10%;
@@ -90,26 +89,10 @@ a {
   bottom: 8%;
   left: -14%;
   background: var(--app-mint);
-  animation-delay: -7s;
-  animation-duration: 23s;
 }
 .app-shell > * {
   position: relative;
   z-index: 1;
-}
-@keyframes ambient-drift {
-  from {
-    transform: translate3d(-10px, -8px, 0) scale(0.96);
-  }
-  to {
-    transform: translate3d(12px, 10px, 0) scale(1.05);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .app-shell::before,
-  .app-shell::after {
-    animation: none;
-  }
 }
 .muted {
   color: var(--app-muted);
